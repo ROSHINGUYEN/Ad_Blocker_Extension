@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>SHIORI AD CLEANER</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { width: 340px; padding: 16px; background: #0f172a; color: #f8fafc; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .title { font-size: 15px; font-weight: 700; color: #38bdf8; }
+    .status-badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: #166534; color: #4ade80; font-weight: 600; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .stat-card { background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid #334155; }
+    .stat-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+    .stat-value { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+    .engine-list { background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 16px; border: 1px solid #334155; }
+    .engine-item { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: #cbd5e1; }
+    .engine-active { color: #38bdf8; font-weight: 600; }
+    .footer { text-align: center; font-size: 11px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">SHIORI AD CLEANER</div>
+    <div class="status-badge">ĐANG BẢO VỆ</div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Requests đã chặn</div>
+      <div class="stat-value" id="net-blocked">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Phần tử DOM đã ẩn</div>
+      <div class="stat-value" id="dom-hidden">0</div>
+    </div>
+  </div>
+
+  <div class="engine-list">
+    <div class="engine-item"><span>WebAd Engine</span><span class="engine-active">Hoạt động</span></div>
+    <div class="engine-item"><span>YouTube Protection</span><span class="engine-active">Bảo vệ</span></div>
+    <div class="engine-item"><span>Intelligence Arbiter</span><span class="engine-active">Sẵn sàng</span></div>
+  </div>
+
+  <div class="footer">Local-first • Privacy Shield Active</div>
+
+  <script>
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({ type: 'GET_STATS' }, (res) => {
+        if (res?.stats) {
+          document.getElementById('net-blocked').textContent = res.stats.requestsFiltered;
+          document.getElementById('dom-hidden').textContent = res.stats.elementsHidden;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

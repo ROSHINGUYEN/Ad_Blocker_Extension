@@ -1,0 +1,20 @@
+{
+  "name": "@shiori/extension",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/background.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shiori/shared": "workspace:*",
+    "@shiori/rules-engine": "workspace:*",
+    "@shiori/intelligence-engine": "workspace:*",
+    "@shiori/web-ad-engine": "workspace:*",
+    "@shiori/youtube-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.308",
+    "typescript": "^5.7.3"
+  }
+}
