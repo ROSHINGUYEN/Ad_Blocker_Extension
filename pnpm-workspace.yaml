@@ -1,0 +1,7 @@
+packages:
+  - 'apps/*'
+  - 'engines/*'
+  - 'engines/intelligence/*'
+  - 'shared'
+allowBuilds:
+  esbuild: true
