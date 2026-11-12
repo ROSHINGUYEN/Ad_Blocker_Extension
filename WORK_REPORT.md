@@ -26,34 +26,46 @@
   - `engines/web-ad`: Triển khai SafeDOMObserver (MutationObserver debounced batching chống nghẽn main thread, dọn dẹp memory). (ĐÃ HOÀN THÀNH)
   - Viết bộ unit test toàn diện cho `engines/rules` và `engines/web-ad`. (ĐÃ HOÀN THÀNH: 15/15 tests passed trên toàn monorepo)
   - Typecheck toàn bộ workspace không có bất kỳ lỗi nào. (ĐÃ HOÀN THÀNH)
-- **Trạng thái ban đầu:** Đã có nền tảng P0. Chưa có code của các engine xử lý rule và web ad.
+- **Trạng thái:** PASS
+
+---
+
+## 2026-11-13 — P2: Intelligence & Decision Engine
+
+- **Mục tiêu:** Xây dựng trung tâm phân tích Shiori Intelligence Engine (`engines/intelligence`) gồm các submodule trích xuất tín hiệu (Network, DOM, Behavior, Media) và Decision Engine Matrix (tính toán confidence scoring tổng hợp từ nhiều nguồn bằng chứng, áp dụng chính sách xử lý dứt khoát hoặc bảo tồn giao diện).
+- **Tiêu chí hoàn thành:**
+  - Network Intelligence: Phân tích URL entropy, third-party origin ratio, query param tracking signatures (`utm_*`, `fbclid`, `gclid`). (ĐÃ HOÀN THÀNH)
+  - DOM Intelligence: Phân tích z-index lạm dụng (> 9999), fixed/sticky viewport obstruction, invisible click-traps (opacity: 0 fixed overlay). (ĐÃ HOÀN THÀNH)
+  - Behavior Intelligence: Phân tích hành vi popup không qua tương tác người dùng (unprompted popup navigation without trusted user gesture), phát hiện protocol nguy hiểm (`javascript:`, `data:`). (ĐÃ HOÀN THÀNH)
+  - Media Intelligence: Theo dõi trạng thái player, video platform ad active, playback error fallback. (ĐÃ HOÀN THÀNH)
+  - Decision Engine: Tổng hợp đa tín hiệu (Multi-signal correlation), cộng điểm synergy bonus khi có bằng chứng từ $\ge 2$ nguồn độc lập, hỗ trợ override chính sách Whitelist, phân loại dứt khoát:
+    - Confidence $\ge 0.85$: `CONFIRMED_AD` $\rightarrow$ `BLOCK`
+    - Confidence $0.65 - 0.84$: `SUSPECTED_AD` $\rightarrow$ `HIDE` (cosmetic)
+    - Confidence $0.40 - 0.64$: `SPONSORED_CONTENT` $\rightarrow$ `WARN`
+    - Confidence $< 0.40$: `LEGITIMATE_CONTENT` $\rightarrow$ `ALLOW`
+  - Viết bộ unit test chuyên sâu cho `engines/intelligence` (ĐÃ HOÀN THÀNH: 5/5 tests passed).
+  - Typecheck toàn bộ workspace (ĐÃ HOÀN THÀNH: 0 errors).
+- **Trạng thái ban đầu:** Hoàn thành P1. Chưa có package `engines/intelligence`.
 - **Phân tích và bằng chứng:**
-  - Thuật toán Trie đảo ngược domain (`com` -> `google` -> `adservice`) cho phép so khớp domain và subdomain với độ phức tạp $O(k)$ cực nhanh.
-  - Sử dụng Regex an toàn cho wildcard filtering URL, phân biệt rõ loại tài nguyên network.
-  - Hạn chế false-positive bằng cách kết hợp ngưỡng confidence $\ge 0.70$ và kiểm tra kích thước banner chuẩn IAB + nhãn nhận diện.
+  - Quyết định chặn không dựa trên 1 tiêu chí đơn lẻ. Khi có tín hiệu đồng thời từ DOM và Network, DecisionEngine tăng trọng số synergy bonus (+15%), nâng cao độ chính xác và triệt tiêu false-positives.
 - **Các bước đã thực hiện:**
-  1. Xây dựng package `@shiori/rules-engine`:
-     - `src/network/fast-trie.ts`: Trie cấu trúc cây đảo ngược domain.
-     - `src/network/matcher.ts`: Network Rule Matcher hỗ trợ domain anchor, wildcard và resource types.
-     - `src/cosmetic/cosmetic-manager.ts`: Quản lý và inject CSS selector ẩn quảng cáo theo domain.
-     - `src/parser/filter-parser.ts`: Parser cú pháp chuẩn EasyList.
-     - `src/rule-engine.ts`: Bộ điều phối nạp rule package, hash verification và rollback.
-     - `test/rules-engine.test.ts`: 5/5 unit tests passed.
-  2. Xây dựng package `@shiori/web-ad-engine`:
-     - `src/iframe/iframe-detector.ts`: Phân tích nguồn iframe, domain bên thứ 3 và kích thước banner IAB.
-     - `src/native/native-detector.ts`: Nhận diện quảng cáo tự nhiên / bài viết tài trợ.
-     - `src/dom/dom-restoration.ts`: Quản lý style gốc và khôi phục DOM tức thì khi cần.
-     - `src/dom/dom-observer.ts`: MutationObserver an toàn với debounced batching.
-     - `src/web-ad-engine.ts`: Bộ điều phối tổng thể cho Web Protection.
-     - `test/web-ad-engine.test.ts`: 5/5 unit tests passed với happy-dom.
-  3. Cài đặt dependency và chạy test toàn hệ sinh thái.
+  1. Tạo package `@shiori/intelligence-engine`:
+     - `src/types/signals.ts`: Định nghĩa cấu trúc `SignalEvidence` (source, weight, suspiciousScore, reason).
+     - `src/network/network-intelligence.ts`: Trích xuất tín hiệu URL tracking, third-party domain.
+     - `src/dom/dom-intelligence.ts`: Đánh giá overlay, z-index, invisible click traps.
+     - `src/behavior/behavior-intelligence.ts`: Đánh giá popup không do user click.
+     - `src/media/media-intelligence.ts`: Theo dõi trạng thái player và video ad.
+     - `src/decision/decision-engine.ts`: Ma trận ra quyết định và chính sách phân loại chuẩn hóa.
+     - `src/intelligence-engine.ts`: Bộ điều phối Context Evaluator kết hợp DOM + Network.
+  2. Viết unit test trong `engines/intelligence/test/intelligence-engine.test.ts`.
+  3. Chạy test toàn hệ thống: 20/20 passed.
 - **File thay đổi:**
-  - `engines/rules/package.json`, `engines/rules/tsconfig.json`, `engines/rules/src/*`, `engines/rules/test/*`
-  - `engines/web-ad/package.json`, `engines/web-ad/tsconfig.json`, `engines/web-ad/src/*`, `engines/web-ad/test/*`
-  - `pnpm-lock.yaml`, `WORK_REPORT.md`, `docs/SHIORI_DEVELOPMENT_STATUS.md`
+  - `engines/intelligence/package.json`, `engines/intelligence/tsconfig.json`
+  - `engines/intelligence/src/*`, `engines/intelligence/test/*`
+  - `WORK_REPORT.md`, `docs/SHIORI_DEVELOPMENT_STATUS.md`
 - **Kiểm thử và kết quả:**
-  - `pnpm test`: **15/15 passed** (100% test case trên cả 3 package: shared, rules-engine, web-ad-engine).
-  - `pnpm typecheck`: **0 errors** (strict mode trên toàn monorepo).
+  - `pnpm test`: **20/20 tests passed** (shared: 5, rules: 5, intelligence: 5, web-ad: 5).
+  - `pnpm typecheck`: **0 errors** trên toàn bộ 4 packages.
 - **Vấn đề còn tồn tại:** Không có.
 - **Trạng thái:** PASS
-- **Bước tiếp theo:** Chuyển sang **P2 — Intelligence Engine** (Xây dựng trung tâm phân tích đa tín hiệu Multi-signal & Decision Engine Arbiter) hoặc **P3 — YouTube Engine** theo roadmap.
+- **Bước tiếp theo:** Chuyển sang giai đoạn **P3 — YouTube Engine** (Module chuyên sâu YouTube UI, Playback Observer, Player Error Circuit Breaker).
