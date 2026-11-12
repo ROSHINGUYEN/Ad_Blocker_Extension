@@ -4,17 +4,19 @@
   "private": true,
   "main": "./src/background.ts",
   "scripts": {
+    "build": "node build.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@shiori/shared": "workspace:*",
-    "@shiori/rules-engine": "workspace:*",
     "@shiori/intelligence-engine": "workspace:*",
+    "@shiori/rules-engine": "workspace:*",
+    "@shiori/shared": "workspace:*",
     "@shiori/web-ad-engine": "workspace:*",
     "@shiori/youtube-engine": "workspace:*"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.308",
+    "esbuild": "^0.28.2",
     "typescript": "^5.7.3"
   }
 }

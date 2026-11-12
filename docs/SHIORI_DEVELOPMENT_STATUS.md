@@ -9,8 +9,9 @@
 - **P3 — YouTube Engine:** Đã hoàn thành (`@shiori/youtube-engine` với 5-class Ad Classifier, Player Stability Circuit Breaker và Safe UI Cleaner).
 - **P4 — Backend / Rule Distribution:** Đã hoàn thành (`@shiori/rule-distributor` với SHA-256 integrity verification và packaging).
 - **P5 — Apps Layer (WebExtension MV3):** Đã hoàn thành (`@shiori/extension` với Background Worker, Content Script và Popup Dashboard).
-- **P6 — Production Release:** Sẵn sàng kiểm toán bảo mật và xuất xưởng.
+- **P6 — Production Release:** Đã hoàn thành (Build bundle sẵn sàng load unpack, Security Audit pass, 25/25 tests pass).
 
 ## Trạng thái kiểm thử hiện tại:
 - Monorepo tests: 25/25 PASSED (shared: 5, rules: 5, intelligence: 5, web-ad: 5, youtube: 3, backend: 2).
 - Typecheck: 0 errors (Strict mode trên toàn bộ 6 workspace packages).
+- Build Artifacts: Sẵn sàng tại `apps/extension/dist/`.

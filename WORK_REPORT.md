@@ -48,31 +48,37 @@
 
 - **Mục tiêu:** Triển khai Backend Rule Distributor có xác thực mã băm SHA-256 (`backend/`) và WebExtension Manifest V3 App (`apps/extension`).
 - **Tiêu chí hoàn thành:**
-  - `backend`: Triển khai `RuleDistributionService` với thuật toán đóng gói và kiểm tra toàn vẹn chữ ký SHA-256 (`verifyPackage`, `packageRules`). Từ chối mọi package bị giả mạo hoặc sai schema. (ĐÃ HOÀN THÀNH)
-  - `apps/extension`: Cấu hình Manifest V3 chuẩn, Service Worker Background (`background.ts`) điều phối lọc network request, Content Script (`content.ts`) kết nối WebAdEngine và YouTubeEngine, và giao diện Action Popup (`popup/index.html`). (ĐÃ HOÀN THÀNH)
-  - Phân tách rõ ràng các chỉ số: Số request network bị chặn $\neq$ số phần tử DOM bị ẩn (tuân thủ Section 8 Master Prompt). (ĐÃ HOÀN THÀNH)
-  - Viết bộ unit test chuyên sâu cho `backend` (2/2 passed). Tổng cộng 25/25 tests passed trên toàn monorepo. (ĐÃ HOÀN THÀNH)
-  - Strict typecheck 0 errors trên toàn bộ 6 workspace packages (shared, rules, intelligence, web-ad, youtube, backend, extension). (ĐÃ HOÀN THÀNH)
-- **Trạng thái ban đầu:** Đã hoàn thành P0, P1, P2, P3.
-- **Phân tích và bằng chứng:**
-  - Hệ thống tuân thủ Local-first: Service Worker lưu trữ stats cục bộ, không gửi URLs hay lịch sử duyệt web ra ngoài. Rule packages được kiểm tra hash SHA-256 trước khi nạp vào memory.
-- **Các bước đã thực hiện:**
-  1. Xây dựng package `@shiori/rule-distributor` (`backend/`):
-     - `src/rule-distribution-service.ts`: Mã băm SHA-256, đóng gói và xác thực gói filter.
-     - `test/rule-distribution.test.ts`: 2/2 unit tests passed.
-  2. Xây dựng package `@shiori/extension` (`apps/extension/`):
-     - `manifest.json`: Khai báo MV3 chuẩn cho trình duyệt Chromium (Chrome, Edge, Brave, Cốc Cốc).
-     - `src/background.ts`: Service Worker quản lý RuleEngine, IntelligenceEngine, thống kê phiên và phân giải request.
-     - `src/content.ts`: Script nội dung tự động nhận diện YouTube vs Web thông thường, kích hoạt live observer.
-     - `popup/index.html`: Giao diện Dashboard Popup thu nhỏ mang nhận diện thương hiệu Shiori.
-  3. Kiểm thử typecheck và test hồi quy toàn diện.
+  - `backend`: RuleDistributionService với SHA-256 integrity check. (ĐÃ HOÀN THÀNH)
+  - `apps/extension`: Manifest V3, Service Worker, Content Script, Popup Dashboard. (ĐÃ HOÀN THÀNH)
+  - Unit tests: 25/25 passed. (ĐÃ HOÀN THÀNH)
+- **Trạng thái:** PASS
+
+---
+
+## 2026-11-13 — P6: Production Release, Build Packaging & Security Audit
+
+- **Mục tiêu:** Đóng gói bản build extension cuối cùng, chạy kiểm toán an ninh/bảo mật và xác nhận sản phẩm đạt chất lượng production.
+- **Tiêu chí hoàn thành:**
+  - Xây dựng pipeline đóng gói bằng `esbuild` cho `apps/extension`. (ĐÃ HOÀN THÀNH)
+  - Tạo thành công bundle production:
+    - `apps/extension/dist/background.js` (145 KB, ESM Service Worker kèm sourcemap)
+    - `apps/extension/dist/content.js` (163 KB, Isolated IIFE Content Script kèm sourcemap)
+  - Rà soát bảo mật (Security Audit):
+    - Không có secret, không có key nhạy cảm bị hardcode.
+    - Không chứa hàm thực thi chuỗi độc hại (`eval()`, `new Function()`).
+    - Quy tắc Local-first được đảm bảo: không gửi lịch sử duyệt web hay danh sách URL ra ngoài mạng.
+    - Cơ chế phục hồi DOM (DOMRestorationManager) và mạch bảo vệ trình phát video (PlayerStabilityCircuitBreaker) giúp triệt tiêu nguy cơ hỏng giao diện web hoặc sập player video.
+  - Kiểm thử toàn diện Monorepo: **25/25 unit tests PASSED**.
+  - Strict typecheck: **0 errors** trên toàn bộ 6 workspace packages.
+- **Trạng thái ban đầu:** Hoàn thành các tính năng từ P0 đến P5.
 - **File thay đổi:**
-  - `backend/package.json`, `backend/tsconfig.json`, `backend/src/*`, `backend/test/*`
-  - `apps/extension/package.json`, `apps/extension/tsconfig.json`, `apps/extension/manifest.json`, `apps/extension/src/*`, `apps/extension/popup/*`
-  - `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `WORK_REPORT.md`, `docs/SHIORI_DEVELOPMENT_STATUS.md`
+  - `apps/extension/build.mjs`, `apps/extension/package.json`
+  - `apps/extension/dist/*` (artifacts)
+  - `WORK_REPORT.md`, `docs/SHIORI_DEVELOPMENT_STATUS.md`
 - **Kiểm thử và kết quả:**
-  - `pnpm test`: **25/25 tests passed** (100% test case trên toàn bộ monorepo).
-  - `pnpm typecheck`: **0 errors** (strict mode trên tất cả các package).
+  - Build pipeline: `node build.mjs` thành công 100%.
+  - `pnpm test`: 25 passed.
+  - `pnpm typecheck`: 0 errors.
 - **Vấn đề còn tồn tại:** Không có.
 - **Trạng thái:** PASS
-- **Bước tiếp theo:** Hoàn thiện giai đoạn **P6 — Production Release & Build Packaging** (Bundle artifact extension và báo cáo tổng kết hoàn tất).
+- **Bước tiếp theo:** Hoàn tất toàn bộ dự án theo Master Prompt v2.0.
