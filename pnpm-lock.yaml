@@ -66,6 +66,28 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(happy-dom@17.6.3)
 
+  engines/youtube:
+    dependencies:
+      '@shiori/intelligence-engine':
+        specifier: workspace:*
+        version: link:../intelligence
+      '@shiori/rules-engine':
+        specifier: workspace:*
+        version: link:../rules
+      '@shiori/shared':
+        specifier: workspace:*
+        version: link:../../shared
+    devDependencies:
+      happy-dom:
+        specifier: ^17.4.4
+        version: 17.6.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(happy-dom@17.6.3)
+
   shared:
     dependencies:
       zod:

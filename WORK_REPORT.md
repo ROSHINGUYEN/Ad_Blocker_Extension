@@ -38,34 +38,44 @@
   - DOM Intelligence: Phân tích z-index lạm dụng (> 9999), fixed/sticky viewport obstruction, invisible click-traps (opacity: 0 fixed overlay). (ĐÃ HOÀN THÀNH)
   - Behavior Intelligence: Phân tích hành vi popup không qua tương tác người dùng (unprompted popup navigation without trusted user gesture), phát hiện protocol nguy hiểm (`javascript:`, `data:`). (ĐÃ HOÀN THÀNH)
   - Media Intelligence: Theo dõi trạng thái player, video platform ad active, playback error fallback. (ĐÃ HOÀN THÀNH)
-  - Decision Engine: Tổng hợp đa tín hiệu (Multi-signal correlation), cộng điểm synergy bonus khi có bằng chứng từ $\ge 2$ nguồn độc lập, hỗ trợ override chính sách Whitelist, phân loại dứt khoát:
-    - Confidence $\ge 0.85$: `CONFIRMED_AD` $\rightarrow$ `BLOCK`
-    - Confidence $0.65 - 0.84$: `SUSPECTED_AD` $\rightarrow$ `HIDE` (cosmetic)
-    - Confidence $0.40 - 0.64$: `SPONSORED_CONTENT` $\rightarrow$ `WARN`
-    - Confidence $< 0.40$: `LEGITIMATE_CONTENT` $\rightarrow$ `ALLOW`
+  - Decision Engine: Tổng hợp đa tín hiệu (Multi-signal correlation), cộng điểm synergy bonus khi có bằng chứng từ $\ge 2$ nguồn độc lập, hỗ trợ override chính sách Whitelist, phân loại dứt khoát. (ĐÃ HOÀN THÀNH)
   - Viết bộ unit test chuyên sâu cho `engines/intelligence` (ĐÃ HOÀN THÀNH: 5/5 tests passed).
   - Typecheck toàn bộ workspace (ĐÃ HOÀN THÀNH: 0 errors).
-- **Trạng thái ban đầu:** Hoàn thành P1. Chưa có package `engines/intelligence`.
+- **Trạng thái:** PASS
+
+---
+
+## 2026-11-13 — P3: YouTube Engine Implementation
+
+- **Mục tiêu:** Triển khai module chuyên sâu `@shiori/youtube-engine` tuân thủ nghiêm ngặt Master Prompt Section 4.2 và Section 15 (Accuracy, Stability, Player Stability First).
+- **Tiêu chí hoàn thành:**
+  - Phân loại rõ ràng 5 nhóm nội dung (`PLATFORM_STREAM_AD`, `PLAYER_OVERLAY_AD`, `FEED_COMPANION_AD`, `CREATOR_SPONSOR_SEGMENT`, `LEGITIMATE_VIDEO`). Tuyệt đối không đánh đồng video stream với banner quảng cáo. (ĐÃ HOÀN THÀNH)
+  - Không hack timeline/speed, không click giả lập, không chặn CDN chunks (`googlevideo.com`). (ĐÃ HOÀN THÀNH)
+  - Triển khai `PlayerStabilityCircuitBreaker`: Theo dõi lỗi playback (`MEDIA_ERR_DECODE`, `MEDIA_ERR_NETWORK`). Khi gặp lỗi lặp lại ($\ge 2$ lần), circuit breaker lập tức ngắt can thiệp (OPEN) và kích hoạt chế độ Fallback ALLOW để bảo toàn luồng phát video của người dùng. (ĐÃ HOÀN THÀNH)
+  - Triển khai `YouTubePlayerObserver`: Giám sát `currentTime`, `duration`, trạng thái `ad-showing` và `error` của phần tử video. (ĐÃ HOÀN THÀNH)
+  - Triển khai `YouTubeUIDetector`: Quét và ẩn các container banner, masthead, companion quảng cáo ngoài player một cách an toàn. (ĐÃ HOÀN THÀNH)
+  - Viết bộ unit test toàn diện cho `engines/youtube` (ĐÃ HOÀN THÀNH: 3/3 tests passed).
+  - Đảm bảo typecheck toàn bộ workspace không có lỗi (ĐÃ HOÀN THÀNH: 0 errors).
+- **Trạng thái ban đầu:** Đã hoàn thành P0, P1, P2.
 - **Phân tích và bằng chứng:**
-  - Quyết định chặn không dựa trên 1 tiêu chí đơn lẻ. Khi có tín hiệu đồng thời từ DOM và Network, DecisionEngine tăng trọng số synergy bonus (+15%), nâng cao độ chính xác và triệt tiêu false-positives.
+  - Triết lý Player Stability First: Video stream không bao giờ bị can thiệp thô bạo bằng CSS `display: none` trên thẻ video gốc. Khi phát hiện player error, mạch bảo vệ (circuit breaker) mở ra để nhường toàn quyền xử lý cho trình phát gốc của YouTube.
 - **Các bước đã thực hiện:**
-  1. Tạo package `@shiori/intelligence-engine`:
-     - `src/types/signals.ts`: Định nghĩa cấu trúc `SignalEvidence` (source, weight, suspiciousScore, reason).
-     - `src/network/network-intelligence.ts`: Trích xuất tín hiệu URL tracking, third-party domain.
-     - `src/dom/dom-intelligence.ts`: Đánh giá overlay, z-index, invisible click traps.
-     - `src/behavior/behavior-intelligence.ts`: Đánh giá popup không do user click.
-     - `src/media/media-intelligence.ts`: Theo dõi trạng thái player và video ad.
-     - `src/decision/decision-engine.ts`: Ma trận ra quyết định và chính sách phân loại chuẩn hóa.
-     - `src/intelligence-engine.ts`: Bộ điều phối Context Evaluator kết hợp DOM + Network.
-  2. Viết unit test trong `engines/intelligence/test/intelligence-engine.test.ts`.
-  3. Chạy test toàn hệ thống: 20/20 passed.
+  1. Tạo package `@shiori/youtube-engine`:
+     - `src/classification/ad-classifier.ts`: Phân loại 5 hình thái nội dung YouTube.
+     - `src/stability/circuit-breaker.ts`: Cơ chế Circuit Breaker bảo vệ trình phát.
+     - `src/observer/player-observer.ts`: Giám sát trạng thái DOM và media video.
+     - `src/ui/youtube-ui-detector.ts`: Nhận diện và thu gom banner/promotions bên ngoài player.
+     - `src/youtube-engine.ts`: Bộ điều phối tổng thể cho YouTube Engine.
+     - `test/youtube-engine.test.ts`: 3/3 unit tests passed.
+  2. Cài đặt và liên kết workspace packages.
+  3. Kiểm thử hồi quy toàn bộ monorepo (23/23 unit tests passed).
 - **File thay đổi:**
-  - `engines/intelligence/package.json`, `engines/intelligence/tsconfig.json`
-  - `engines/intelligence/src/*`, `engines/intelligence/test/*`
+  - `engines/youtube/package.json`, `engines/youtube/tsconfig.json`
+  - `engines/youtube/src/*`, `engines/youtube/test/*`
   - `WORK_REPORT.md`, `docs/SHIORI_DEVELOPMENT_STATUS.md`
 - **Kiểm thử và kết quả:**
-  - `pnpm test`: **20/20 tests passed** (shared: 5, rules: 5, intelligence: 5, web-ad: 5).
-  - `pnpm typecheck`: **0 errors** trên toàn bộ 4 packages.
+  - `pnpm test`: **23/23 tests passed** (shared: 5, rules: 5, intelligence: 5, web-ad: 5, youtube: 3).
+  - `pnpm typecheck`: **0 errors** trên toàn bộ 5 packages.
 - **Vấn đề còn tồn tại:** Không có.
 - **Trạng thái:** PASS
-- **Bước tiếp theo:** Chuyển sang giai đoạn **P3 — YouTube Engine** (Module chuyên sâu YouTube UI, Playback Observer, Player Error Circuit Breaker).
+- **Bước tiếp theo:** Tiếp tục giai đoạn **P4 — Backend & Rule Distribution** hoặc xây dựng **WebExtension App / Dashboard** (`apps/`).
