@@ -155,12 +155,54 @@ export function initializeContentProtection(): void {
     return count;
   }
 
-  // Initial and live DOM scanning
-  if (typeof document !== 'undefined') {
-    if (document.body) {
-      runScan();
+  // Immediate execution for YouTube (do not wait for DOM ready!)
+  if (isYouTube) {
+    const sweepYouTubeAds = () => {
+      if (!isProtectionEnabled) return;
+      const adIndicator = document.querySelector(
+        '.ad-showing, .ad-interrupting, .ytp-ad-player-overlay, .ytp-ad-text, [class*="ytp-ad-module"], ytd-ad-slot-renderer, [class*="skip-button"]'
+      );
+      const video = document.querySelector('video') as HTMLVideoElement | null;
+      if (adIndicator && video) {
+        // 1. Mute ad immediately
+        video.muted = true;
+        // 2. Fast forward ad straight to end
+        if (video.duration && isFinite(video.duration) && video.duration > 0) {
+          video.playbackRate = 16.0;
+          if (video.currentTime < video.duration - 0.1) {
+            video.currentTime = video.duration;
+          }
+        }
+        // 3. Auto click skip button
+        const skipBtn = document.querySelector<HTMLElement>(
+          '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button, .videoAdUiSkipButton, [class*="skip-button"], div.ytp-ad-text'
+        );
+        if (skipBtn) {
+          skipBtn.click();
+        }
+      }
+    };
+
+    // Run every 25ms continuously
+    setInterval(sweepYouTubeAds, 25);
+
+    const ytObserver = new MutationObserver(sweepYouTubeAds);
+    const startObserver = () => {
+      const target = document.body || document.documentElement;
+      if (target) {
+        ytObserver.observe(target, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['class', 'src']
+        });
+      }
+    };
+
+    if (document.documentElement) {
+      startObserver();
     } else {
-      document.addEventListener('DOMContentLoaded', runScan);
+      document.addEventListener('DOMContentLoaded', startObserver);
     }
   }
 
