@@ -34,20 +34,14 @@
   }
 
   // --------------------------------------------------------------------------
-  // YOUTUBE AD HUNTER & 16X FAST-SKIP TERMINATOR
+  // YOUTUBE AD HUNTER — Mute + Skip-only (NO currentTime / playbackRate hack)
+  // Lý do: YouTube SSAI phát hiện currentTime/playbackRate => màn hình đen
   // --------------------------------------------------------------------------
   const YOUTUBE_AD_INDICATORS = [
     '.ad-showing',
     '.ad-interrupting',
-    '.ytp-ad-player-overlay',
-    '.ytp-ad-text',
-    '.ytp-ad-module',
-    '.ytp-ad-badge',
-    '.ytp-ad-overlay-container',
     'ytd-ad-slot-renderer',
     'ytd-player-legacy-desktop-watch-ads-renderer',
-    '[class*="ytp-ad-"]',
-    '[class*="skip-button"]'
   ];
 
   const YOUTUBE_SKIP_BUTTONS = [
@@ -58,9 +52,7 @@
     'button.ytp-ad-skip-button-text',
     '.ytp-ad-skip-button-container button',
     '.videoAdUiSkipButton',
-    '[class*="skip-button"]',
-    'div.ytp-ad-text',
-    'button[id*="skip"]'
+    'button[id*="skip"]',
   ];
 
   function detectYouTubeAd(): boolean {
@@ -71,12 +63,12 @@
       }
     }
     for (const selector of YOUTUBE_AD_INDICATORS) {
-      if (document.querySelector(selector)) {
-        return true;
-      }
+      if (document.querySelector(selector)) return true;
     }
     return false;
   }
+
+  let adMuted = false;
 
   function handleYouTubeAdState() {
     if (!isExtensionEnabled) return;
@@ -89,60 +81,68 @@
     const isAdActive = detectYouTubeAd();
 
     if (isAdActive) {
-      // 1. Tắt tiếng ngay lập tức để không làm ồn
-      video.muted = true;
-
-      // 2. Kích hoạt chế độ 16x Fast-Forward: Tua tốc độ tối đa 16x & nhảy thẳng về cuối quảng cáo
-      video.playbackRate = 16.0;
-      if (video.duration && isFinite(video.duration) && video.duration > 0) {
-        if (video.currentTime < video.duration - 0.1) {
-          video.currentTime = video.duration;
-        }
+      // 1. Tắt tiếng ngay — không tua, không can thiệp playbackRate
+      if (!adMuted) {
+        video.muted = true;
+        video.volume = 0;
+        adMuted = true;
       }
 
-      // 3. Tự động gọi API bỏ qua nếu player hỗ trợ
+      // 2. Gọi skipAd() API nếu player hỗ trợ (skippable ads)
       try {
-        if (typeof player.skipAd === 'function') {
-          player.skipAd();
-        }
+        if (typeof player.skipAd === 'function') player.skipAd();
       } catch {}
 
-      // 4. Tự động click đồng loạt tất cả nút "Bỏ qua" / "Skip Ad"
+      // 3. Click tất cả nút Skip có thể xuất hiện
       for (const sel of YOUTUBE_SKIP_BUTTONS) {
-        const btns = document.querySelectorAll<HTMLElement>(sel);
-        btns.forEach((btn) => {
+        document.querySelectorAll<HTMLElement>(sel).forEach((btn) => {
           dispatchClick(btn);
         });
       }
 
-      // Quét thêm bất kỳ button nào có nội dung chứa chữ "Bỏ qua" hoặc "Skip"
-      const allButtons = document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text');
-      allButtons.forEach((btn) => {
-        const txt = btn.textContent?.trim().toLowerCase() || '';
-        if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
+      // 4. Quét text "Bỏ qua" / "Skip"
+      document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button').forEach((btn) => {
+        const txt = (btn.textContent || '').trim().toLowerCase();
+        if (txt.includes('bỏ qua') || txt.includes('skip')) {
           dispatchClick(btn);
         }
       });
     } else {
-      // Khi quảng cáo kết thúc và video chính phát: Đưa tốc độ về 1.0x bình thường
-      if (video.playbackRate > 1.0) {
-        video.playbackRate = 1.0;
+      // Quảng cáo kết thúc — bật âm thanh lại
+      if (adMuted) {
+        video.muted = false;
+        video.volume = 1;
+        adMuted = false;
       }
     }
   }
 
-  // Quét vòng lặp nhanh 30ms kết hợp MutationObserver để bắt kịp quảng cáo ngay mili-giây đầu tiên
-  setInterval(handleYouTubeAdState, 30);
+  // Interval 200ms — đủ nhanh, không quá aggressive để tránh SSAI detect
+  setInterval(handleYouTubeAdState, 200);
 
-  const adObserver = new MutationObserver(handleYouTubeAdState);
-  if (document.documentElement) {
-    adObserver.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'src']
-    });
+  // MutationObserver chỉ theo dõi class thay đổi trên #movie_player (nhẹ hơn, đủ để bắt ad-showing)
+  function setupAdObserver() {
+    const player = document.getElementById('movie_player');
+    if (player) {
+      new MutationObserver(handleYouTubeAdState).observe(player, {
+        attributes: true,
+        attributeFilter: ['class'],
+      });
+    } else {
+      // Chờ player load
+      new MutationObserver((_m, obs) => {
+        const p = document.getElementById('movie_player');
+        if (p) {
+          obs.disconnect();
+          new MutationObserver(handleYouTubeAdState).observe(p, {
+            attributes: true,
+            attributeFilter: ['class'],
+          });
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    }
   }
+  setupAdObserver();
 
   window.addEventListener('yt-navigate-finish', () => {
     handleYouTubeAdState();

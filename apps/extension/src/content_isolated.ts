@@ -59,10 +59,28 @@ const INLINE_SHIELD_CSS = `
   a[href*="utm_medium"], a[href*="utm_campaign"],
   iframe[src*="adx"], iframe[src*="catfish"], iframe[src*="banner"],
   iframe[src*="popads"], iframe[src*="clickadu"],
-  /* YouTube ad overlays */
-  .ytp-ad-overlay-container, .ytp-ad-message-container,
-  ytd-ad-slot-renderer, #player-ads, ytd-banner-promo-renderer,
-  ytd-in-feed-ad-layout-renderer {
+  /* YouTube in-stream ad overlays — ẩn toàn bộ UI quảng cáo khi đang phát */
+  .ytp-ad-overlay-container,
+  .ytp-ad-message-container,
+  .ytp-ad-player-overlay,
+  .ytp-ad-player-overlay-instream-info,
+  .ytp-ad-text-overlay,
+  .ytp-ad-progress,
+  .ytp-ad-progress-list,
+  .ytp-ad-simple-ad-badge,
+  .ytp-ad-badge,
+  .ytp-ad-preview-container,
+  .ytp-ad-preview-text-container,
+  .ytp-ad-visit-advertiser-button,
+  .ytp-ce-element,
+  #movie_player.ad-showing .ytp-chrome-bottom,
+  #movie_player.ad-showing .ytp-gradient-bottom,
+  ytd-ad-slot-renderer,
+  #player-ads,
+  ytd-banner-promo-renderer,
+  ytd-in-feed-ad-layout-renderer,
+  ytd-promoted-sparkles-web-renderer,
+  #masthead-ad {
     display: none !important;
     visibility: hidden !important;
     pointer-events: none !important;
