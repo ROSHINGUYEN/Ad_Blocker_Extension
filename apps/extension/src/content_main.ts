@@ -52,7 +52,7 @@
     const isAdPlaying =
       player.classList?.contains('ad-showing') ||
       player.classList?.contains('ad-interrupting') ||
-      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module, ytd-ad-slot-renderer, .ytp-ad-badge, [class*="ytp-ad-"]'));
+      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module, ytd-ad-slot-renderer, .ytp-ad-badge, [class*="ytp-ad-"], [class*="skip-button"]'));
 
     if (isAdPlaying) {
       if (!handlingAd) {
@@ -81,7 +81,7 @@
         }
       } catch {}
 
-      // 5. Aggressive click on ALL known YouTube skip ad selectors (NO offsetParent check)
+      // 5. Aggressive click on ALL known YouTube skip ad selectors (including buttons, spans, divs)
       const skipSelectors = [
         '.ytp-ad-skip-button',
         '.ytp-ad-skip-button-modern',
@@ -91,20 +91,33 @@
         'button[id*="skip"]',
         '.videoAdUiSkipButton',
         '[class*="skip-button"]',
-        '.ytp-ad-skip-button-container button'
+        '.ytp-ad-skip-button-container button',
+        '.ytp-ad-skip-button-container',
+        'div[class*="ytp-ad-skip-button"]',
+        'button.ytp-ad-text'
       ];
 
       for (const sel of skipSelectors) {
-        const btn = document.querySelector(sel) as HTMLElement | null;
-        if (btn) {
-          dispatchSyntheticClick(btn);
-          break;
-        }
+        const elements = document.querySelectorAll<HTMLElement>(sel);
+        elements.forEach((el) => {
+          dispatchSyntheticClick(el);
+        });
       }
 
-      // 6. If ad clip has ended or currentTime === duration, force resume main video
+      // Also click anything with text "Bỏ qua" or "Skip"
+      const allButtons = document.querySelectorAll<HTMLElement>('button, div[role="button"]');
+      allButtons.forEach((btn) => {
+        const txt = btn.textContent?.trim().toLowerCase() || '';
+        if (txt.includes('bỏ qua') || txt.includes('skip')) {
+          dispatchSyntheticClick(btn);
+        }
+      });
+
+      // 6. Force clear ad overlay class from player if stuck
       if (video.currentTime >= (video.duration - 0.2)) {
         try {
+          player.classList?.remove('ad-showing');
+          player.classList?.remove('ad-interrupting');
           if (typeof player.playVideo === 'function') {
             player.playVideo();
           }
