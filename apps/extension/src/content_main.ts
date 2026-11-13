@@ -81,12 +81,15 @@
     const isAdActive = detectYouTubeAd();
 
     if (isAdActive) {
-      // 1. Tắt tiếng ngay — không tua, không can thiệp playbackRate
+      // 1. Tắt tiếng + tua 16x (5s ad → kết thúc trong ~0.3s)
+      // KHÔNG dùng currentTime = duration → gây SSAI black screen
+      // playbackRate = 16 là an toàn, không trigger SSAI detection
       if (!adMuted) {
         video.muted = true;
         video.volume = 0;
         adMuted = true;
       }
+      video.playbackRate = 16.0;
 
       // 2. Gọi skipAd() API nếu player hỗ trợ (skippable ads)
       try {
@@ -108,11 +111,14 @@
         }
       });
     } else {
-      // Quảng cáo kết thúc — bật âm thanh lại
+      // Quảng cáo kết thúc — bật âm thanh + khôi phục tốc độ
       if (adMuted) {
         video.muted = false;
         video.volume = 1;
         adMuted = false;
+      }
+      if (video.playbackRate !== 1.0) {
+        video.playbackRate = 1.0;
       }
     }
   }
