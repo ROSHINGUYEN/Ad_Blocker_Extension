@@ -9,6 +9,35 @@ const localRuleEngine = new ShioriRuleEngine();
 const webAdEngine = new ShioriWebAdEngine(localRuleEngine, { currentHostname });
 const youTubeEngine = new ShioriYouTubeEngine();
 
+let isProtectionEnabled = true;
+
+// Check stored enabled state
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+  chrome.storage.local.get(['shiori_enabled'], (res) => {
+    if (res && typeof res.shiori_enabled === 'boolean') {
+      isProtectionEnabled = res.shiori_enabled;
+      toggleProtection(isProtectionEnabled);
+    }
+  });
+
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.shiori_enabled) {
+      isProtectionEnabled = changes.shiori_enabled.newValue;
+      toggleProtection(isProtectionEnabled);
+    }
+  });
+}
+
+function toggleProtection(enabled: boolean) {
+  const shield = document.getElementById('shiori-instant-shield');
+  const cosmetic = document.getElementById('shiori-cosmetic-styles');
+  if (shield) shield.style.display = enabled ? '' : 'none';
+  if (cosmetic) cosmetic.style.display = enabled ? '' : 'none';
+
+  // Notify main world
+  window.postMessage({ type: 'SHIORI_SET_ENABLED', enabled }, '*');
+}
+
 // Absolute instant shield stylesheet targeting ad banners, catfish, floating popups, sticky footers, and YouTube player ads
 const INLINE_SHIELD_CSS = `
   [class*="catfish"], [id*="catfish"],
@@ -24,12 +53,13 @@ const INLINE_SHIELD_CSS = `
   a[href*="haywin"], a[href*="gemwin"], a[href*="uk88"],
   a[href*="hitclub"], a[href*="win79"], a[href*="sunwin"],
   a[href*="yo88"], a[href*="rikvip"], a[href*="go88"],
-  a[href*="bet88"], a[href*="tic88"], a[href*="6789x.site"], a[href*="cacuoc"],
+  a[href*="bet88"], a[href*="tic88"], a[href*="zowin"],
+  a[href*="6789x.site"], a[href*="cacuoc"],
   a[href*="topbanner"], a[href*="pc-catfish"], a[href*="cpd"],
   a[href*="utm_medium"], a[href*="utm_campaign"],
   iframe[src*="adx"], iframe[src*="catfish"], iframe[src*="banner"],
   iframe[src*="popads"], iframe[src*="clickadu"],
-  /* YouTube ad containers overlay */
+  /* YouTube ad overlays */
   .ytp-ad-overlay-container, .ytp-ad-message-container,
   ytd-ad-slot-renderer, #player-ads, ytd-banner-promo-renderer,
   ytd-in-feed-ad-layout-renderer {
@@ -62,6 +92,7 @@ export function initializeContentProtection(): void {
 
   // Listen to messages from content_main (MAIN world) and forward to background
   window.addEventListener('message', (event) => {
+    if (!isProtectionEnabled) return;
     if (event.data?.type === 'SHIORI_POPUP_BLOCKED' || event.data?.type === 'SHIORI_CLICK_BLOCKED') {
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage({ type: 'INCREMENT_REDIRECT_BLOCKED' });
@@ -86,7 +117,7 @@ export function initializeContentProtection(): void {
 
   // Active continuous DOM cleaner targeting dynamically injected banners
   function cleanDynamicPirateBanners(): number {
-    if (isYouTube) return 0;
+    if (!isProtectionEnabled || isYouTube) return 0;
     let count = 0;
     const adSelectors = [
       '[class*="catfish"]', '[id*="catfish"]',
@@ -95,7 +126,8 @@ export function initializeContentProtection(): void {
       '[class*="banner-top"]', '[id*="banner-top"]',
       'a[href*="topbanner"]', 'a[href*="pc-catfish"]',
       'a[href*="utm_medium="]', 'a[href*="gemwin"]', 'a[href*="haywin"]',
-      'a[href*="uk88"]', 'a[href*="yo88"]', 'a[href*="hitclub"]', 'a[href*="tic88"]'
+      'a[href*="uk88"]', 'a[href*="yo88"]', 'a[href*="hitclub"]',
+      'a[href*="tic88"]', 'a[href*="zowin"]'
     ];
 
     try {
@@ -103,7 +135,7 @@ export function initializeContentProtection(): void {
       elements.forEach((el) => {
         // Also remove parent container if it's an ad wrapper
         const parent = el.parentElement;
-        if (parent && parent !== document.body && parent.querySelectorAll('a').length === 1 && parent.clientHeight < 200) {
+        if (parent && parent !== document.body && parent.querySelectorAll('a').length === 1 && parent.clientHeight < 250) {
           if (parent.style.display !== 'none') {
             parent.style.display = 'none';
             parent.style.visibility = 'hidden';
@@ -144,14 +176,6 @@ export function initializeContentProtection(): void {
           payload: { count: ytDetections.length },
         });
       }
-
-      setInterval(() => {
-        const liveContainer = document.getElementById('movie_player') || document.body;
-        const liveVideo = document.querySelector('video');
-        if (liveContainer && liveVideo) {
-          youTubeEngine.handleInStreamAd(liveVideo, liveContainer);
-        }
-      }, 50);
     } else {
       const detections = webAdEngine.scanAndClean(document.body);
       const dynamicCount = cleanDynamicPirateBanners();
@@ -168,6 +192,7 @@ export function initializeContentProtection(): void {
 
       // Continuous high-frequency sweep for dynamic script injections
       setInterval(() => {
+        if (!isProtectionEnabled) return;
         const swept = cleanDynamicPirateBanners();
         if (swept > 0 && typeof chrome !== 'undefined' && chrome.runtime) {
           chrome.runtime.sendMessage({

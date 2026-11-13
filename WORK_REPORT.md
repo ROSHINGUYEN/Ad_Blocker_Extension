@@ -129,3 +129,23 @@
   - `pnpm -C apps/extension build`: build thành công toàn bộ bundle.
 - **Trạng thái:** PASS
 - **Bước tiếp theo:** Người dùng reload tiện ích tại `chrome://extensions/` để kiểm tra trực tiếp.
+
+
+---
+
+## 2026-11-13 — Enterprise Fullstack & Security Architecture Upgrade
+
+- **Mục tiêu:**
+  1. Khắc phục dứt điểm lỗi tua nhầm video chính trên YouTube: chỉ can thiệp khi YouTube thật sự đang phát quảng cáo (`ad-showing`, `ad-interrupting`), lưu trữ và phục hồi nguyên vẹn `playbackRate` và trạng thái `muted` cho video chính.
+  2. Cải tiến cơ chế Skip YouTube bằng chuỗi sự kiện tương tác giả lập (`dispatchSyntheticClick`), tự động bấm nút bỏ qua quảng cáo mà không cần người dùng thao tác.
+  3. Sửa lỗi công tắc Extension: lưu trạng thái `shiori_enabled` vào `chrome.storage.local`, khi người dùng TẮT sẽ giữ nguyên trạng thái TẮT (không tự bật lại), đồng thời vô hiệu hóa tức thì toàn bộ listener và phục hồi hiển thị trang.
+  4. Nâng cấp thuật toán dọn sạch banner overlay & catfish (`ZOWIN`, `TIC88`, `topbanner`, `cpd`), dọn sạch cả khung wrapper cha để tránh để lại khoảng trống màu đen trên trang phim.
+- **Tiêu chí hoàn thành:**
+  - YouTube: video chính phát bình thường với đúng tốc độ 1.0x (hoặc tốc độ người dùng đã chọn), chỉ có ad bị tắt tiếng và tua 16x + tự động click Skip button. (ĐÃ HOÀN THÀNH)
+  - Công tắc bật/tắt (Toggle Switch): trạng thái được đồng bộ bền vững qua `chrome.storage.local`, giao diện Popup chuyển đổi giữa `ACTIVE` (Xanh) và `PAUSED` (Đỏ). (ĐÃ HOÀN THÀNH)
+  - Banner và tab nhảy: dọn dẹp sạch sẽ 0ms ở Capture Phase. (ĐÃ HOÀN THÀNH)
+- **Kiểm thử và kết quả:**
+  - `pnpm test`: 28/28 tests passed.
+  - `pnpm typecheck`: 0 errors trên toàn bộ 8 workspace packages.
+  - Build pipeline: build thành công `dist/` và `popup/popup.js`.
+- **Trạng thái:** PASS

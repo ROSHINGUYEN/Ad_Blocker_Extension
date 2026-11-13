@@ -1,66 +1,105 @@
-// Main world script: Direct YouTube Ad Speedup & Window.open Popunder Guard
+// Main world script: Direct YouTube Ad Auto-Skip & 0ms Click Interceptor
 (function() {
-  // 1. YouTube High-Speed Auto-Skip Engine running in MAIN world (Direct access to HTML5 video element)
+  // Check if extension is enabled
+  let isExtensionEnabled = true;
+  try {
+    const stored = localStorage.getItem('shiori_enabled');
+    if (stored !== null) isExtensionEnabled = stored === 'true';
+  } catch {}
+
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'SHIORI_SET_ENABLED') {
+      isExtensionEnabled = Boolean(event.data.enabled);
+    }
+  });
+
+  // 1. YouTube High-Speed Auto-Skip Engine running in MAIN world
+  function dispatchSyntheticClick(el: HTMLElement) {
+    const opts = { bubbles: true, cancelable: true, composed: true, view: window };
+    el.dispatchEvent(new PointerEvent('pointerdown', opts));
+    el.dispatchEvent(new MouseEvent('mousedown', opts));
+    el.dispatchEvent(new PointerEvent('pointerup', opts));
+    el.dispatchEvent(new MouseEvent('mouseup', opts));
+    el.dispatchEvent(new MouseEvent('click', opts));
+  }
+
+  let handlingAd = false;
+  let originalPlaybackRate = 1.0;
+  let originalMuted = false;
+
   function handleYouTubeAdState() {
+    if (!isExtensionEnabled) return;
     if (!window.location.hostname.includes('youtube.com')) return;
 
-    const player = document.getElementById('movie_player') as HTMLElement | null;
+    const player = document.getElementById('movie_player') as any;
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    const isAd =
-      player.classList.contains('ad-showing') ||
-      player.classList.contains('ad-interrupting') ||
-      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module, ytd-ad-slot-renderer'));
+    // Strict YouTube ad detection: player must have ad-showing or ad-interrupting class
+    const isAdPlaying =
+      player.classList?.contains('ad-showing') ||
+      player.classList?.contains('ad-interrupting');
 
-    if (isAd) {
-      // 1. Instant Mute
+    if (isAdPlaying) {
+      if (!handlingAd) {
+        handlingAd = true;
+        originalPlaybackRate = video.playbackRate > 2.0 ? 1.0 : (video.playbackRate || 1.0);
+        originalMuted = video.muted;
+      }
+
+      // 1. Mute ad immediately
       video.muted = true;
-      // 2. Maximum Playback Rate
+
+      // 2. Fast-forward ad to avoid user waiting
       video.playbackRate = 16.0;
-      // 3. Immediately seek to end of ad clip
-      if (video.duration && isFinite(video.duration)) {
+
+      // 3. Only seek ad video, and check duration safely
+      if (video.duration && isFinite(video.duration) && video.duration < 300) {
         video.currentTime = video.duration;
       }
 
-      // 4. Force click all known skip buttons instantly
+      // 4. Dispatch synthetic click on all skip ad button variants
       const skipSelectors = [
         '.ytp-ad-skip-button',
         '.ytp-ad-skip-button-modern',
         'button.ytp-ad-skip-button-text',
         '.ytp-skip-ad-button',
         '.ytp-ad-skip-button-slot button',
-        'button[id*="skip"]'
+        'button[id*="skip"]',
+        '.videoAdUiSkipButton'
       ];
+
       for (const sel of skipSelectors) {
         const btn = document.querySelector(sel) as HTMLElement | null;
-        if (btn) {
-          btn.click();
+        if (btn && btn.offsetParent !== null) { // must be visible
+          dispatchSyntheticClick(btn);
           break;
         }
+      }
+    } else {
+      // Restore normal playback for the main video
+      if (handlingAd) {
+        handlingAd = false;
+        video.muted = originalMuted;
+        video.playbackRate = originalPlaybackRate;
       }
     }
   }
 
-  // Interval check every 50ms for instant reaction
-  setInterval(handleYouTubeAdState, 50);
+  // Interval check every 100ms
+  setInterval(handleYouTubeAdState, 100);
 
-  // Hook into video element playback events directly
+  // Hook into video element playback events
   document.addEventListener('play', (e) => {
     if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
       handleYouTubeAdState();
     }
   }, true);
 
-  document.addEventListener('timeupdate', (e) => {
-    if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
-      handleYouTubeAdState();
-    }
+  window.addEventListener('yt-navigate-finish', () => {
+    handlingAd = false;
+    handleYouTubeAdState();
   }, true);
-
-  // Hook into YouTube SPA navigation lifecycle
-  window.addEventListener('yt-navigate-finish', handleYouTubeAdState, true);
-  window.addEventListener('spfdone', handleYouTubeAdState, true);
 
   // 2. Intercept window.open popunders (0ms latency)
   let lastRealClickTimestamp = 0;
@@ -71,6 +110,10 @@
   try {
     const originalOpen = window.open;
     window.open = function(url?: string | URL, target?: string, features?: string): Window | null {
+      if (!isExtensionEnabled) {
+        return originalOpen.call(window, url, target, features);
+      }
+
       const urlStr = url ? String(url) : '';
       const timeSinceClick = Date.now() - lastRealClickTimestamp;
       const currentHost = window.location.hostname;
@@ -112,6 +155,7 @@
       lower.includes('go88') ||
       lower.includes('bet88') ||
       lower.includes('tic88') ||
+      lower.includes('zowin') ||
       lower.includes('6789x.site') ||
       lower.includes('cacuoc') ||
       lower.includes('gamebai') ||
@@ -124,6 +168,8 @@
   }
 
   function interceptPotentialAdTrigger(event: MouseEvent | PointerEvent) {
+    if (!isExtensionEnabled) return;
+
     let el = event.target as HTMLElement | null;
     while (el && el !== document.body && el !== document.documentElement) {
       if (el.tagName === 'A') {
@@ -131,7 +177,6 @@
         const href = anchor.href || anchor.getAttribute('href') || '';
         
         if (isMaliciousAdLink(href)) {
-          // Neutralize IMMEDIATELY on pointerdown before mouseup/click creates the tab
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();
@@ -146,7 +191,6 @@
     }
   }
 
-  // Intercept at all critical stages of the click pipeline (Capture phase)
   window.addEventListener('pointerdown', interceptPotentialAdTrigger, true);
   window.addEventListener('mousedown', interceptPotentialAdTrigger, true);
   window.addEventListener('click', interceptPotentialAdTrigger, true);

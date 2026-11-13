@@ -15,7 +15,7 @@ async function bundleExtension() {
     bundle: true,
     format: 'esm',
     target: 'es2022',
-    minify: false, // Keep readable for inspection/audit
+    minify: false,
     sourcemap: true,
   });
 
@@ -40,7 +40,18 @@ async function bundleExtension() {
     sourcemap: true,
   });
 
-  console.log('Build completed successfully! Artifacts ready in apps/extension/dist/');
+  // 3. Bundle Popup Script
+  await build({
+    entryPoints: [resolve(__dirname, 'popup/popup.ts')],
+    outfile: resolve(__dirname, 'popup/popup.js'),
+    bundle: true,
+    format: 'iife',
+    target: 'es2022',
+    minify: false,
+    sourcemap: false,
+  });
+
+  console.log('Build completed successfully! Artifacts ready in apps/extension/dist/ & popup/');
 }
 
 bundleExtension().catch((err) => {
