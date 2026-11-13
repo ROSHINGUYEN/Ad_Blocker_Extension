@@ -44,15 +44,6 @@
 
   <div class="footer">Local-first • Privacy Shield Active</div>
 
-  <script>
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: 'GET_STATS' }, (res) => {
-        if (res?.stats) {
-          document.getElementById('net-blocked').textContent = res.stats.requestsFiltered;
-          document.getElementById('dom-hidden').textContent = res.stats.elementsHidden;
-        }
-      });
-    }
-  </script>
+  <script src="popup.js"></script>
 </body>
 </html>
