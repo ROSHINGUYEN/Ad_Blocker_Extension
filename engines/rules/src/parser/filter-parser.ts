@@ -11,9 +11,17 @@ export function parseAdblockRuleLine(line: string, index: number): BaseRule | nu
     return null;
   }
 
+  // Exception rules (@@) và cosmetic exception/extended (#@#, #?#, #$#) chưa được hỗ trợ.
+  // Bỏ qua thay vì biến thành rule CHẶN sai nghĩa.
+  if (trimmed.startsWith('@@') || /#[@?$%]#/.test(trimmed)) {
+    return null;
+  }
+
   // 1. Cosmetic Element Hiding Rule: domain##selector or ##selector
-  if (trimmed.includes('##')) {
-    const [domainsPart, selector] = trimmed.split('##');
+  const cosmeticIdx = trimmed.indexOf('##');
+  if (cosmeticIdx !== -1) {
+    const domainsPart = trimmed.slice(0, cosmeticIdx);
+    const selector = trimmed.slice(cosmeticIdx + 2); // giữ nguyên selector chứa '##'
     if (!selector) return null;
 
     let domains: string[] | undefined;
@@ -28,7 +36,7 @@ export function parseAdblockRuleLine(line: string, index: number): BaseRule | nu
     }
 
     const cosmeticRule: CosmeticRule = {
-      id: `cosm_${index}_${Math.random().toString(36).substr(2, 6)}`,
+      id: `cosm_${index}`,
       type: 'cosmetic',
       action: 'hide',
       pattern: trimmed,
@@ -45,9 +53,12 @@ export function parseAdblockRuleLine(line: string, index: number): BaseRule | nu
   let pattern = trimmed;
   let resourceTypes: Array<'script' | 'image' | 'stylesheet' | 'xmlhttprequest' | 'sub_frame' | 'media' | 'other'> | undefined;
 
-  if (trimmed.includes('$')) {
-    const [basePattern, optionsPart] = trimmed.split('$');
-    pattern = basePattern || trimmed;
+  const dollarIdx = trimmed.lastIndexOf('$');
+  if (dollarIdx > 0) {
+    // Chỉ tách options ở dấu '$' CUỐI, để pattern chứa '$' không bị cắt cụt
+    const basePattern = trimmed.slice(0, dollarIdx);
+    const optionsPart = trimmed.slice(dollarIdx + 1);
+    pattern = basePattern;
     if (optionsPart) {
       const opts = optionsPart.split(',');
       const validTypes: typeof resourceTypes = [];
@@ -63,7 +74,7 @@ export function parseAdblockRuleLine(line: string, index: number): BaseRule | nu
   }
 
   const networkRule: NetworkRule = {
-    id: `net_${index}_${Math.random().toString(36).substr(2, 6)}`,
+    id: `net_${index}`,
     type: 'network',
     action: 'block',
     pattern,

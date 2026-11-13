@@ -18,6 +18,12 @@ export class DOMRestorationManager {
    * Safely hides an element while storing its original layout styles for restoration.
    */
   public hideElement(element: HTMLElement, reason: string): string {
+    // Idempotent: ẩn lần 2 sẽ ghi đè originalDisplay = 'none' và làm restoreAll() không khôi phục được
+    const already = element.getAttribute('data-shiori-hidden-id');
+    if (already && this.hiddenElements.has(already)) {
+      return already;
+    }
+    this.pruneDetached();
     const recordId = `hide_${++this.elementIdCounter}_${Date.now()}`;
     const originalDisplay = element.style.display;
     const originalVisibility = element.style.visibility;
@@ -44,7 +50,8 @@ export class DOMRestorationManager {
       return false;
     }
 
-    record.element.style.display = record.originalDisplay;
+    record.element.style.removeProperty('display'); // gỡ cả cờ !important
+    if (record.originalDisplay) record.element.style.display = record.originalDisplay;
     record.element.style.visibility = record.originalVisibility;
     record.element.removeAttribute('data-shiori-hidden-id');
     this.hiddenElements.delete(recordId);
@@ -62,6 +69,14 @@ export class DOMRestorationManager {
       }
     }
     return count;
+  }
+
+  /** Giải phóng tham chiếu tới phần tử đã bị xoá khỏi DOM (tránh rò rỉ bộ nhớ). */
+  private pruneDetached(): void {
+    if (this.hiddenElements.size < 200) return;
+    for (const [id, rec] of this.hiddenElements) {
+      if (!rec.element.isConnected) this.hiddenElements.delete(id);
+    }
   }
 
   public getHiddenCount(): number {

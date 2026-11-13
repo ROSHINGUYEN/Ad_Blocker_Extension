@@ -1,267 +1,67 @@
-// Main world script: Direct YouTube Ad Auto-Skip & 0ms Click Interceptor
-(function() {
-  let isExtensionEnabled = true;
-  try {
-    const stored = localStorage.getItem('shiori_enabled');
-    if (stored !== null) isExtensionEnabled = stored === 'true';
-  } catch {}
+/**
+ * Content script (MAIN world, mọi trang & mọi frame): chặn pop-up / pop-under / click-hijack.
+ * Được đăng ký ĐỘNG bởi background chỉ khi bộ chặn đang BẬT (xem syncMainWorldScripts).
+ *
+ * Quyết định dựa trên HOSTNAME của đích, không dựa trên chuỗi con của URL.
+ */
+import { isBlockedUrl, isSameSite } from '@shiori/shared/src/utilities/url-guard';
 
-  window.addEventListener('message', (event) => {
-    if (event.data?.type === 'SHIORI_SET_ENABLED') {
-      isExtensionEnabled = Boolean(event.data.enabled);
-    }
-  });
+(() => {
+  const notify = (type: 'SHIORI_POPUP_BLOCKED' | 'SHIORI_CLICK_BLOCKED') =>
+    window.postMessage({ source: 'shiori-main', type }, '*');
 
-  // 1. YouTube Auto-Skip Engine
-  function dispatchClick(el: HTMLElement) {
-    try {
-      const rect = el.getBoundingClientRect();
-      const opts = {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-      };
-      el.dispatchEvent(new PointerEvent('pointerdown', opts));
-      el.dispatchEvent(new MouseEvent('mousedown', opts));
-      el.dispatchEvent(new PointerEvent('pointerup', opts));
-      el.dispatchEvent(new MouseEvent('mouseup', opts));
-      el.dispatchEvent(new MouseEvent('click', opts));
-      el.click();
-    } catch {}
-  }
+  /* ---------------- window.open ---------------- */
+  const nativeOpen = window.open;
 
-  // --------------------------------------------------------------------------
-  // YOUTUBE AD HUNTER — Instant Skip & 16x/End Acceleration
-  // --------------------------------------------------------------------------
-  const YOUTUBE_AD_INDICATORS = [
-    '.ad-showing',
-    '.ad-interrupting',
-    '.ytp-ad-player-overlay',
-    '.ytp-ad-player-overlay-instream-info',
-    'ytd-ad-slot-renderer',
-    'ytd-player-legacy-desktop-watch-ads-renderer',
-  ];
+  function guardedOpen(this: unknown, url?: string | URL, target?: string, features?: string): Window | null {
+    const href = url == null ? '' : String(url);
 
-  const YOUTUBE_SKIP_BUTTONS = [
-    '.ytp-ad-skip-button-modern',
-    '.ytp-skip-ad-button',
-    '.ytp-ad-skip-button',
-    '.ytp-ad-skip-button-slot button',
-    'button.ytp-ad-skip-button-text',
-    '.ytp-ad-skip-button-container button',
-    '.ytp-ad-skip-button-container',
-    '.videoAdUiSkipButton',
-    'button[id*="skip"]',
-    '.ytp-ad-skip-ad-button',
-  ];
+    // 1) Đích nằm trong danh sách chặn: chặn kể cả khi có click thật (click-hijack)
+    let blocked = isBlockedUrl(href, location.href);
 
-  function detectYouTubeAd(): boolean {
-    const player = document.getElementById('movie_player') as HTMLElement | null;
-    if (player) {
-      if (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')) {
-        return true;
-      }
-    }
-    for (const selector of YOUTUBE_AD_INDICATORS) {
-      if (document.querySelector(selector)) return true;
-    }
-    return false;
-  }
-
-  let adMuted = false;
-
-  function handleYouTubeAdState() {
-    if (!isExtensionEnabled) return;
-    if (!window.location.hostname.includes('youtube.com')) return;
-
-    const player = document.getElementById('movie_player') as any;
-    const video = document.querySelector('video') as HTMLVideoElement | null;
-    if (!player || !video) return;
-
-    const isAdActive = detectYouTubeAd();
-
-    if (isAdActive) {
-      // 1. Tắt tiếng tức thì 0ms
-      if (!adMuted) {
-        video.muted = true;
-        video.volume = 0;
-        adMuted = true;
-      }
-
-      // 2. Tua cực nhanh 16x để hết ad ngay
-      video.playbackRate = 16.0;
-
-      // Nhảy thời gian an toàn nếu duration hợp lệ (bỏ qua đoạn video quảng cáo)
-      if (video.duration && isFinite(video.duration) && video.duration > 0) {
-        if (video.currentTime < video.duration - 0.1) {
-          video.currentTime = video.duration - 0.05;
-        }
-      }
-
-      // 3. Tận dụng Player Internal APIs
+    // 2) Khác site + KHÔNG có user activation => pop-under chạy từ timer/script.
+    //    Dùng navigator.userActivation thay cho mốc "500ms kể từ pointerdown" của bản cũ, vốn chặn nhầm
+    //    cửa sổ đăng nhập OAuth, thanh toán 3-D Secure, nút chia sẻ... (mọi window.open sang domain khác).
+    if (!blocked && href) {
       try {
-        if (typeof player.skipAd === 'function') player.skipAd();
-        if (typeof player.cancelPlayback === 'function') player.cancelPlayback();
-      } catch {}
-
-      // 4. Click liên tục tất cả các dạng nút Skip Ad
-      for (const sel of YOUTUBE_SKIP_BUTTONS) {
-        const btns = document.querySelectorAll<HTMLElement>(sel);
-        btns.forEach((btn) => {
-          dispatchClick(btn);
-        });
-      }
-
-      // 5. Quét tất cả button trong .ytp-ad-module & click nếu có text Skip / Bỏ qua
-      document.querySelectorAll<HTMLElement>('.ytp-ad-module button, .video-ads button, .ytp-ad-text').forEach((btn) => {
-        const txt = (btn.textContent || '').trim().toLowerCase();
-        if (txt.includes('bỏ qua') || txt.includes('skip') || txt === 'skip ad') {
-          dispatchClick(btn);
-        }
-      });
-    } else {
-      // Quảng cáo kết thúc — phục hồi âm thanh & tốc độ 1.0x
-      if (adMuted) {
-        video.muted = false;
-        video.volume = 1;
-        adMuted = false;
-      }
-      if (video.playbackRate !== 1.0) {
-        video.playbackRate = 1.0;
+        const targetHost = new URL(href, location.href).hostname;
+        const hasActivation = navigator.userActivation?.isActive ?? true;
+        blocked = !hasActivation && !isSameSite(targetHost, location.hostname);
+      } catch {
+        /* URL lạ: để trình duyệt tự xử lý */
       }
     }
-  }
 
-  // Tăng tần suất quét lên 50ms để bắt nút skip và tua ngay không độ trễ
-  setInterval(handleYouTubeAdState, 50);
-
-  // MutationObserver chỉ theo dõi class thay đổi trên #movie_player (nhẹ hơn, đủ để bắt ad-showing)
-  function setupAdObserver() {
-    const player = document.getElementById('movie_player');
-    if (player) {
-      new MutationObserver(handleYouTubeAdState).observe(player, {
-        attributes: true,
-        attributeFilter: ['class'],
-      });
-    } else {
-      // Chờ player load
-      new MutationObserver((_m, obs) => {
-        const p = document.getElementById('movie_player');
-        if (p) {
-          obs.disconnect();
-          new MutationObserver(handleYouTubeAdState).observe(p, {
-            attributes: true,
-            attributeFilter: ['class'],
-          });
-        }
-      }).observe(document.documentElement, { childList: true, subtree: true });
+    if (blocked) {
+      notify('SHIORI_POPUP_BLOCKED');
+      return null;
     }
+    return nativeOpen.call(window, url as string | URL, target, features);
   }
-  setupAdObserver();
-
-  window.addEventListener('yt-navigate-finish', () => {
-    handleYouTubeAdState();
-  }, true);
-
-  // 2. Intercept window.open popunders (0ms latency)
-  let lastRealClickTimestamp = 0;
-  window.addEventListener('pointerdown', (e: PointerEvent) => {
-    if (e.isTrusted) lastRealClickTimestamp = Date.now();
-  }, true);
-
+  Object.defineProperty(guardedOpen, 'name', { value: 'open' });
   try {
-    const originalOpen = window.open;
-    window.open = function(url?: string | URL, target?: string, features?: string): Window | null {
-      if (!isExtensionEnabled) {
-        return originalOpen.call(window, url, target, features);
-      }
-
-      const urlStr = url ? String(url) : '';
-      const timeSinceClick = Date.now() - lastRealClickTimestamp;
-      const currentHost = window.location.hostname;
-
-      const isThirdParty = Boolean(
-        urlStr &&
-        !urlStr.startsWith('/') &&
-        !urlStr.startsWith('./') &&
-        !urlStr.includes(currentHost)
-      );
-
-      if (timeSinceClick > 500 || isThirdParty) {
-        window.postMessage({ type: 'SHIORI_POPUP_BLOCKED', url: urlStr }, '*');
-        return null;
-      }
-
-      return originalOpen.call(window, url, target, features);
-    };
-  } catch {}
-
-  // 3. ZERO-LATENCY Click Neutralizer on Pointerdown & Mousedown (PREVENT TAB SPAWN)
-  function isMaliciousAdLink(href: string): boolean {
-    if (!href) return false;
-    const lower = href.toLowerCase();
-    return (
-      lower.includes('topbanner') ||
-      lower.includes('catfish') ||
-      lower.includes('utm_medium') ||
-      lower.includes('utm_campaign') ||
-      lower.includes('cpd') ||
-      lower.includes('gemwin') ||
-      lower.includes('haywin') ||
-      lower.includes('uk88') ||
-      lower.includes('hitclub') ||
-      lower.includes('win79') ||
-      lower.includes('sunwin') ||
-      lower.includes('yo88') ||
-      lower.includes('rikvip') ||
-      lower.includes('go88') ||
-      lower.includes('bet88') ||
-      lower.includes('tic88') ||
-      lower.includes('zowin') ||
-      lower.includes('6789x.site') ||
-      lower.includes('cacuoc') ||
-      lower.includes('gamebai') ||
-      lower.includes('nhacai') ||
-      lower.includes('popads') ||
-      lower.includes('clickadu') ||
-      lower.includes('sex') ||
-      lower.includes('xxx') ||
-      lower.includes('porn') ||
-      lower.includes('hentai') ||
-      lower.includes('jav') ||
-      lower.includes('vlxx')
-    );
+    window.open = guardedOpen as typeof window.open;
+  } catch {
+    /* một số trang khoá window.open */
   }
 
-  function interceptPotentialAdTrigger(event: MouseEvent | PointerEvent) {
-    if (!isExtensionEnabled) return;
-
-    let el = event.target as HTMLElement | null;
-    while (el && el !== document.body && el !== document.documentElement) {
-      if (el.tagName === 'A') {
-        const anchor = el as HTMLAnchorElement;
-        const href = anchor.href || anchor.getAttribute('href') || '';
-        
-        if (isMaliciousAdLink(href)) {
-          event.preventDefault();
-          event.stopPropagation();
-          event.stopImmediatePropagation();
-          anchor.removeAttribute('href');
-          anchor.removeAttribute('target');
-          anchor.style.pointerEvents = 'none';
-          window.postMessage({ type: 'SHIORI_CLICK_BLOCKED', url: href }, '*');
-          return;
-        }
-      }
-      el = el.parentElement;
+  /* ---------------- Click vào link độc hại ---------------- */
+  function findAnchor(event: Event): HTMLAnchorElement | null {
+    for (const node of event.composedPath()) {
+      if (node instanceof HTMLAnchorElement && node.hasAttribute('href')) return node;
     }
+    return null;
   }
 
-  window.addEventListener('pointerdown', interceptPotentialAdTrigger, true);
-  window.addEventListener('mousedown', interceptPotentialAdTrigger, true);
-  window.addEventListener('click', interceptPotentialAdTrigger, true);
-  window.addEventListener('auxclick', interceptPotentialAdTrigger, true);
+  function onActivate(event: MouseEvent): void {
+    const anchor = findAnchor(event);
+    if (!anchor || !isBlockedUrl(anchor.href)) return;
+    // Không xoá href / không đổi style (bản cũ làm hỏng link vĩnh viễn kể cả khi tắt extension)
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    notify('SHIORI_CLICK_BLOCKED');
+  }
+
+  window.addEventListener('click', onActivate, true);
+  window.addEventListener('auxclick', onActivate, true);
 })();

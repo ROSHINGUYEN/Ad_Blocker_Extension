@@ -8,6 +8,7 @@ export class ShioriRuleEngine {
   private cosmeticManager = new CosmeticRuleManager();
   private activePackages: Map<string, ShioriRulePackage> = new Map();
   private ruleHistory: ShioriRulePackage[] = []; // For rollback
+  private static readonly MAX_HISTORY = 10;
 
   /**
    * Loads a verified rule package.
@@ -19,8 +20,13 @@ export class ShioriRuleEngine {
     }
 
     // Save previous state for rollback if package already exists
-    if (this.activePackages.has(pkg.packageId)) {
-      this.ruleHistory.push(this.activePackages.get(pkg.packageId)!);
+    const existing = this.activePackages.get(pkg.packageId);
+    if (existing) {
+      this.ruleHistory.push(existing);
+      // Giới hạn lịch sử để không rò rỉ bộ nhớ khi cập nhật rule liên tục
+      if (this.ruleHistory.length > ShioriRuleEngine.MAX_HISTORY) {
+        this.ruleHistory.shift();
+      }
     }
 
     this.activePackages.set(pkg.packageId, pkg);
@@ -32,7 +38,14 @@ export class ShioriRuleEngine {
    * Reverts to previous rule package version (Rollback).
    */
   public rollbackPackage(packageId: string): boolean {
-    const lastVersionIndex = this.ruleHistory.findIndex((p) => p.packageId === packageId);
+    // Lấy bản GẦN NHẤT của package (findIndex cũ lấy bản cũ nhất -> rollback sai phiên bản)
+    let lastVersionIndex = -1;
+    for (let i = this.ruleHistory.length - 1; i >= 0; i--) {
+      if (this.ruleHistory[i]?.packageId === packageId) {
+        lastVersionIndex = i;
+        break;
+      }
+    }
     if (lastVersionIndex === -1) {
       return false;
     }
@@ -60,7 +73,7 @@ export class ShioriRuleEngine {
     });
 
     const pkg: ShioriRulePackage = {
-      packageId: `pkg_${packageName}_${Date.now()}`,
+      packageId: `pkg_${packageName}`, // ổn định: nạp lại cùng tên sẽ THAY THẾ, không cộng dồn
       name: packageName,
       version: '1.0.0',
       checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', // Baseline SHA-256

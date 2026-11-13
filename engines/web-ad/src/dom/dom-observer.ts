@@ -17,12 +17,18 @@ export class SafeDOMObserver {
 
   constructor(private options: DynamicObserverOptions) {
     const delay = options.debounceMs ?? 50;
-    this.debouncedProcess = debounce(() => {
-      if (this.pendingNodes.size === 0) return;
-      const batch = Array.from(this.pendingNodes);
-      this.pendingNodes.clear();
-      this.options.onNewElements(batch);
-    }, delay);
+    this.debouncedProcess = debounce(() => this.flush(), delay);
+  }
+
+  private maxWaitTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private flush(): void {
+    if (this.pendingNodes.size === 0) return;
+    // Bỏ node con nếu tổ tiên của nó cũng đang chờ -> tránh quét lặp cùng một cây (O(n²))
+    const all = Array.from(this.pendingNodes).filter((n) => n.isConnected);
+    this.pendingNodes.clear();
+    const batch = all.filter((n) => !all.some((o) => o !== n && o.contains(n)));
+    if (batch.length) this.options.onNewElements(batch);
   }
 
   public start(root: Node = document.body): void {
@@ -40,6 +46,13 @@ export class SafeDOMObserver {
         }
       }
       this.debouncedProcess();
+      // debounce thuần có thể bị "đói" nếu DOM thay đổi liên tục (ticker, animation): ép chạy tối đa mỗi 500ms
+      if (this.maxWaitTimer === null) {
+        this.maxWaitTimer = setTimeout(() => {
+          this.maxWaitTimer = null;
+          this.flush();
+        }, 500);
+      }
     });
 
     this.observer.observe(root, {
@@ -55,6 +68,10 @@ export class SafeDOMObserver {
       this.observer = null;
     }
     this.debouncedProcess.cancel();
+    if (this.maxWaitTimer !== null) {
+      clearTimeout(this.maxWaitTimer);
+      this.maxWaitTimer = null;
+    }
     this.pendingNodes.clear();
     this.isObserving = false;
   }

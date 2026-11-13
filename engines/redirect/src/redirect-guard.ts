@@ -1,3 +1,5 @@
+import { isBlockedUrl, isSameSite } from '@shiori/shared';
+
 export interface NavigationDecision {
   allow: boolean;
   reason: string;
@@ -50,31 +52,24 @@ export class RedirectGuard {
       };
     }
 
-    // 3. Same-origin or same root-domain is always safe (e.g. browsing within youtube.com or animevietsub)
-    try {
-      const parsedTarget = new URL(targetUrl);
-      const targetHost = parsedTarget.hostname.toLowerCase();
-      const currentCleanHost = currentHost.toLowerCase();
+    // 3. Đích nằm trong danh sách chặn (cờ bạc / người lớn / mạng pop-under) -> luôn chặn,
+    //    kể cả khi có thao tác click thật (click-hijack).
+    if (isBlockedUrl(targetUrl)) {
+      return { allow: false, reason: 'Destination is on the blocked host list', isPopunderTrap: true };
+    }
 
-      if (
-        targetHost === currentCleanHost ||
-        targetHost.endsWith('.' + currentCleanHost) ||
-        currentCleanHost.endsWith('.' + targetHost)
-      ) {
+    // 4. Cùng site (kiểm tra ranh giới dấu chấm, không dùng endsWith trần)
+    try {
+      const targetHost = new URL(targetUrl).hostname.toLowerCase();
+      if (isSameSite(targetHost, currentHost)) {
         return { allow: true, reason: 'Same-origin / subdomain navigation', isPopunderTrap: false };
       }
-
-      // Check if targetHost is an authentic major content/video platform (Never block authentic user clicks to legitimate destinations)
-      const COMMON_SAFE_HOSTS = ['google.', 'youtube.com', 'facebook.com', 'twitter.com', 'x.com', 'discord.', 'github.com'];
-      if (COMMON_SAFE_HOSTS.some((safe) => targetHost.includes(safe))) {
-        return { allow: true, reason: 'Trusted platform navigation', isPopunderTrap: false };
-      }
     } catch {
-      // Relative URL or invalid URL -> relative URLs belong to the same site!
+      // URL tương đối / không hợp lệ -> cùng site
       return { allow: true, reason: 'Relative same-site navigation', isPopunderTrap: false };
     }
 
-    // 4. Default: User clicked intentionally on a link that is genuine
+    // 5. Default: User clicked intentionally on a link that is genuine
     return { allow: true, reason: 'Genuine user-initiated navigation', isPopunderTrap: false };
   }
 }

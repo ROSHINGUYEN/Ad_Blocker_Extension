@@ -39,3 +39,6 @@ Cargo.lock
 *.crx
 *.pem
 _metadata/
+
+# Build output (tạo bằng `pnpm --filter @shiori/extension build`)
+apps/extension/popup/popup.js

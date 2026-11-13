@@ -1,248 +1,264 @@
 import { ShioriRuleEngine } from '@shiori/rules-engine';
-import { ShioriIntelligenceEngine } from '@shiori/intelligence-engine';
-import { RedirectGuard } from '@shiori/redirect-guard';
-import { ProtectionStatistics } from '@shiori/shared';
+import { isBlockedUrl } from '@shiori/shared';
+import type { ProtectionStatistics } from '@shiori/shared';
 
 import { closeZombieAndEmptyTabs } from './tab_cleaner';
 
-// Initialize background engines
+/* -------------------------------------------------------------------------- */
+/* Rule engine (chỉ dùng cho cosmetic CSS; chặn mạng do declarativeNetRequest) */
+/* -------------------------------------------------------------------------- */
 export const ruleEngine = new ShioriRuleEngine();
-export const intelligenceEngine = new ShioriIntelligenceEngine();
-export const redirectGuard = new RedirectGuard();
 
-// Persistent metrics tracking
-export const sessionStats: ProtectionStatistics = {
-  requestsFiltered: 0,
-  elementsHidden: 0,
-  redirectsBlocked: 0,
-  trackersBlocked: 0,
-  activeEnginesCount: 5,
-  updatedAt: Date.now(),
-};
-
-// Baseline filter rules loading
-ruleEngine.loadFromRawText(`
-! Shiori Baseline Rules
-||doubleclick.net^$script
-||googleads.g.doubleclick.net^
-||popads.net^
-||adservice.google.com^
-||clickadu.com^
-||adsterra.com^
-||propellerads.com^
-||6789x.site^
-||gemwin^
-||haywin^
-||yo88^
-||uk88^
-||hitclub^
-||win79^
-||sunwin^
-||rikvip^
-||go88^
-||bet88^
-||tic88^
-||zowin^
-||pornhub^
-||xvideos^
-||xnxx^
-||vlxx^
+// Các rule domain cờ bạc/người lớn KHÔNG nằm ở đây: dạng `||gemwin^` không khớp được host thật
+// (trie cần domain đầy đủ). Chúng được xử lý bởi rules/rules.json (regexFilter) và url-guard.
+ruleEngine.loadFromRawText(
+  `
+! Shiori Baseline Cosmetic Rules
 ##.ad-banner
 ##.sponsor-card
 ##.popup-banner
 ##.floating-banner
 ##.ad-bottom
-##.banner-center
-##.banner-top
 ##.catfish-banner
 ##[class*="catfish"]
 ##[id*="catfish"]
-`, 'shiori_core_filter');
+`,
+  'shiori_core_filter'
+);
+
+/* -------------------------------------------------------------------------- */
+/* Thống kê: bền vững qua việc service worker MV3 bị kill (storage.session)   */
+/* -------------------------------------------------------------------------- */
+const STATS_KEY = 'shiori_stats';
+type CounterKey = 'requestsFiltered' | 'elementsHidden' | 'redirectsBlocked' | 'trackersBlocked';
+
+let stats: ProtectionStatistics = {
+  requestsFiltered: 0,
+  elementsHidden: 0,
+  redirectsBlocked: 0,
+  trackersBlocked: 0,
+  activeEnginesCount: 2,
+  updatedAt: Date.now(),
+};
+
+function statsArea(): chrome.storage.StorageArea {
+  return chrome.storage.session ?? chrome.storage.local;
+}
+
+const statsReady: Promise<void> = (async () => {
+  try {
+    const saved = (await statsArea().get(STATS_KEY))[STATS_KEY] as Partial<ProtectionStatistics> | undefined;
+    if (saved) stats = { ...stats, ...saved };
+  } catch {
+    /* bỏ qua: dùng số liệu trong RAM */
+  }
+})();
+
+let flushQueued = false;
+function persistStats(): void {
+  if (flushQueued) return;
+  flushQueued = true;
+  queueMicrotask(() => {
+    flushQueued = false;
+    statsArea().set({ [STATS_KEY]: stats }).catch(() => {});
+  });
+}
+
+async function bump(key: CounterKey, n = 1): Promise<void> {
+  await statsReady; // tránh bị ghi đè bởi lần nạp ban đầu
+  stats[key] += n;
+  stats.updatedAt = Date.now();
+  persistStats();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Trạng thái bật/tắt + đăng ký script MAIN-world                              */
+/* -------------------------------------------------------------------------- */
+async function isEnabled(): Promise<boolean> {
+  try {
+    const r = await chrome.storage.local.get('shiori_enabled');
+    return typeof r.shiori_enabled === 'boolean' ? r.shiori_enabled : true;
+  } catch {
+    return true;
+  }
+}
+
+// Script MAIN-world đăng ký ĐỘNG theo trạng thái bật/tắt. Cách cũ dùng postMessage/localStorage của
+// trang để báo trạng thái -> bất kỳ trang web nào cũng có thể tắt bộ chặn.
+const MAIN_WORLD_SCRIPTS: chrome.scripting.RegisteredContentScript[] = [
+  {
+    id: 'shiori-main-guard',
+    matches: ['<all_urls>'],
+    js: ['dist/content_main.js'],
+    runAt: 'document_start',
+    world: 'MAIN',
+    allFrames: true,
+    persistAcrossSessions: true,
+  },
+  {
+    id: 'shiori-main-youtube',
+    matches: ['*://*.youtube.com/*'],
+    js: ['dist/content_youtube.js'],
+    runAt: 'document_start',
+    world: 'MAIN',
+    persistAcrossSessions: true,
+  },
+];
+
+async function syncMainWorldScripts(enabled: boolean): Promise<void> {
+  try {
+    const ids = MAIN_WORLD_SCRIPTS.map((s) => s.id);
+    const registered = new Set((await chrome.scripting.getRegisteredContentScripts({ ids })).map((s) => s.id));
+    if (enabled) {
+      const missing = MAIN_WORLD_SCRIPTS.filter((s) => !registered.has(s.id));
+      if (missing.length) await chrome.scripting.registerContentScripts(missing);
+    } else if (registered.size) {
+      await chrome.scripting.unregisterContentScripts({ ids: [...registered] });
+    }
+  } catch (err) {
+    console.warn('[Shiori] syncMainWorldScripts failed', err);
+  }
+}
+
+chrome.runtime.onInstalled.addListener(async () => {
+  // Dọn rule "Accept-Encoding" của bản cũ (id 10001): ép zstd trên Chromium cũ gây lỗi giải mã trang
+  chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [10001] }).catch(() => {});
+  // Badge đếm số request đã chặn theo tab (không cần quyền debug)
+  chrome.declarativeNetRequest.setExtensionActionOptions({ displayActionCountAsBadgeText: true }).catch(() => {});
+  await syncMainWorldScripts(await isEnabled());
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+  await syncMainWorldScripts(await isEnabled());
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.shiori_enabled) {
+    void syncMainWorldScripts(changes.shiori_enabled.newValue !== false);
+  }
+});
+
+// Chỉ hoạt động khi build unpacked (onRuleMatchedDebug); bản đóng gói dùng badge ở trên.
+chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener(() => {
+  void bump('requestsFiltered');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Chặn tab pop-up / pop-under tới host độc hại                                */
+/* -------------------------------------------------------------------------- */
+// Chỉ đóng tab do trang khác MỞ RA (có openerTabId). Tab người dùng tự gõ/điều hướng trong tab của mình
+// được DNR chặn ở main_frame (không đóng mất tab của người dùng như bản cũ).
+async function closeIfPopupToBlockedHost(tabId: number, url: string): Promise<void> {
+  if (tabId < 0 || !isBlockedUrl(url) || !(await isEnabled())) return;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.openerTabId !== undefined) {
+      await chrome.tabs.remove(tabId);
+      await bump('redirectsBlocked');
+    }
+  } catch {
+    /* tab đã đóng */
+  }
+}
+
+chrome.webNavigation.onBeforeNavigate.addListener((d) => {
+  if (d.frameId === 0) void closeIfPopupToBlockedHost(d.tabId, d.url);
+});
+
+chrome.tabs.onCreated.addListener((tab) => {
+  if (tab.id !== undefined) void closeIfPopupToBlockedHost(tab.id, tab.pendingUrl || tab.url || '');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Tối ưu RAM: chỉ discard tab an toàn                                         */
+/* -------------------------------------------------------------------------- */
+async function discardIdleTabs(): Promise<number> {
+  try {
+    const tabs = await chrome.tabs.query({
+      active: false,
+      audible: false,
+      discarded: false,
+      autoDiscardable: true,
+      windowType: 'normal',
+    });
+    const targets = tabs.filter((t) => t.id !== undefined && !t.pinned && /^https?:/i.test(t.url ?? ''));
+    const results = await Promise.allSettled(targets.map((t) => chrome.tabs.discard(t.id!)));
+    return results.filter((r) => r.status === 'fulfilled').length;
+  } catch {
+    return 0;
+  }
+}
+
+async function clearHttpCache(): Promise<void> {
+  // CHỈ xoá cache HTTP. Bản cũ còn xoá cacheStorage/serviceWorkers/fileSystems của MỌI trang
+  // -> làm hỏng PWA, mất dữ liệu offline mà người dùng không hề được hỏi.
+  await chrome.browsingData.removeCache({ since: 0 });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Message router (có kiểm tra nguồn gửi)                                      */
+/* -------------------------------------------------------------------------- */
+type Msg =
+  | { type: 'GET_STATS' }
+  | { type: 'CLEAN_MEMORY_NOW' }
+  | { type: 'CLEAR_CACHE_NOW' }
+  | { type: 'INCREMENT_DOM_HIDDEN'; payload?: { count?: number } }
+  | { type: 'INCREMENT_REDIRECT_BLOCKED'; payload?: { count?: number } }
+  | { type: 'GET_COSMETIC_CSS'; payload?: { hostname?: string } };
+
+const POPUP_ONLY = new Set(['GET_STATS', 'CLEAN_MEMORY_NOW', 'CLEAR_CACHE_NOW']);
+const CONTENT_ONLY = new Set(['INCREMENT_DOM_HIDDEN', 'INCREMENT_REDIRECT_BLOCKED', 'GET_COSMETIC_CSS']);
+
+function clampCount(n: unknown): number {
+  return Math.min(Math.max(Math.trunc(Number(n) || 1), 1), 1000);
+}
+
+function respondAsync<T>(work: Promise<T>, sendResponse: (r: unknown) => void): true {
+  work.then(sendResponse).catch((err) => sendResponse({ success: false, error: String(err) }));
+  return true; // giữ kênh mở cho phản hồi bất đồng bộ
+}
 
 export function handleExtensionMessage(
-  message: { type: string; payload?: any },
-  _sender: any,
-  sendResponse: (res: any) => void
+  message: Msg,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (res: unknown) => void
 ): boolean {
+  if (sender.id !== chrome.runtime.id) return false;
+  const fromContentScript = sender.tab !== undefined;
+  if (POPUP_ONLY.has(message?.type) && fromContentScript) return false; // trang web không được gọi API nhạy cảm
+  if (CONTENT_ONLY.has(message?.type) && !fromContentScript) return false;
+
   switch (message.type) {
     case 'GET_STATS':
-      sendResponse({ success: true, stats: sessionStats });
-      break;
+      return respondAsync(statsReady.then(() => ({ success: true, stats })), sendResponse);
 
     case 'INCREMENT_DOM_HIDDEN':
-      sessionStats.elementsHidden += message.payload?.count || 1;
-      sessionStats.updatedAt = Date.now();
-      sendResponse({ success: true, count: sessionStats.elementsHidden });
-      break;
+      return respondAsync(bump('elementsHidden', clampCount(message.payload?.count)).then(() => ({ success: true })), sendResponse);
 
     case 'INCREMENT_REDIRECT_BLOCKED':
-      sessionStats.redirectsBlocked += message.payload?.count || 1;
-      sessionStats.updatedAt = Date.now();
-      sendResponse({ success: true, count: sessionStats.redirectsBlocked });
-      break;
+      return respondAsync(bump('redirectsBlocked', clampCount(message.payload?.count)).then(() => ({ success: true })), sendResponse);
 
-    case 'CLEAN_MEMORY_NOW': {
-      Promise.all([discardIdleTabs(), closeZombieAndEmptyTabs()]).then(([discardedCount, closedCount]) => {
-        sendResponse({ success: true, count: discardedCount, closed: closedCount });
-      });
-      return true;
-    }
+    case 'CLEAN_MEMORY_NOW':
+      return respondAsync(
+        Promise.all([discardIdleTabs(), closeZombieAndEmptyTabs()]).then(([discarded, closed]) => ({
+          success: true,
+          count: discarded,
+          closed,
+        })),
+        sendResponse
+      );
 
-    case 'CLEAR_CACHE_NOW': {
-      if (typeof chrome !== 'undefined' && chrome.browsingData) {
-        chrome.browsingData.removeCache({}, () => {
-          sendResponse({ success: true });
-        });
-        return true;
-      }
-      sendResponse({ success: false });
-      break;
-    }
-
-    case 'EVALUATE_URL': {
-      const url = message.payload?.url;
-      const resourceType = message.payload?.resourceType;
-      const match = ruleEngine.matchNetwork(url, resourceType);
-      if (match) {
-        sessionStats.requestsFiltered++;
-        sessionStats.updatedAt = Date.now();
-        sendResponse({ blocked: true, rule: match });
-      } else {
-        sendResponse({ blocked: false });
-      }
-      break;
-    }
+    case 'CLEAR_CACHE_NOW':
+      return respondAsync(clearHttpCache().then(() => ({ success: true })), sendResponse);
 
     case 'GET_COSMETIC_CSS': {
-      const host = message.payload?.hostname || '';
-      const css = ruleEngine.getInjectedCssForHost(host);
-      sendResponse({ css });
-      break;
+      const host = String(message.payload?.hostname ?? '').slice(0, 253);
+      return respondAsync(isEnabled().then(async (on) => ({ css: on ? ruleEngine.getInjectedCssForHost(host) : '' })), sendResponse);
     }
 
     default:
-      sendResponse({ success: false, error: 'Unknown message type' });
-  }
-  return true;
-}
-
-if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-  chrome.runtime.onMessage.addListener(handleExtensionMessage);
-}
-
-// Track Declarative Net Request blocks
-if (typeof chrome !== 'undefined' && chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDebug) {
-  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((_info) => {
-    sessionStats.requestsFiltered++;
-    sessionStats.updatedAt = Date.now();
-  });
-}
-
-// Check if a URL matches malicious, gambling, or adult patterns
-function isSuspiciousUrl(url: string): boolean {
-  if (!url || url === 'about:blank') return false;
-  const lower = url.toLowerCase();
-  return (
-    lower.includes('utm_medium=topbanner') ||
-    lower.includes('utm_medium=pc-catfish') ||
-    lower.includes('utm_campaign=cpd') ||
-    lower.includes('gemwin') ||
-    lower.includes('haywin') ||
-    lower.includes('uk88') ||
-    lower.includes('hitclub') ||
-    lower.includes('win79') ||
-    lower.includes('sunwin') ||
-    lower.includes('yo88') ||
-    lower.includes('rikvip') ||
-    lower.includes('go88') ||
-    lower.includes('bet88') ||
-    lower.includes('tic88') ||
-    lower.includes('zowin') ||
-    lower.includes('6789x.site') ||
-    lower.includes('cacuoc') ||
-    lower.includes('gamebai') ||
-    lower.includes('nhacai') ||
-    lower.includes('popads') ||
-    lower.includes('clickadu') ||
-    lower.includes('adsterra') ||
-    lower.includes('propellerads') ||
-    lower.includes('pornhub') ||
-    lower.includes('xvideos') ||
-    lower.includes('xnxx') ||
-    lower.includes('hentai') ||
-    lower.includes('vlxx') ||
-    lower.includes('phimsex') ||
-    lower.includes('sex')
-  );
-}
-
-// 0MS ZERO-LATENCY INTERCEPTION: Kill tab before navigation occurs (Spans Incognito tabs too!)
-if (typeof chrome !== 'undefined' && chrome.webNavigation && chrome.webNavigation.onBeforeNavigate) {
-  chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-    if (details.frameId === 0 && details.tabId > 0 && isSuspiciousUrl(details.url)) {
-      chrome.tabs.remove(details.tabId).catch(() => {});
-      sessionStats.redirectsBlocked++;
-      sessionStats.updatedAt = Date.now();
-    }
-  });
-}
-
-// Tab Creation & Update Guard
-if (typeof chrome !== 'undefined' && chrome.tabs) {
-  if (chrome.tabs.onCreated) {
-    chrome.tabs.onCreated.addListener((tab) => {
-      const targetUrl = tab.pendingUrl || tab.url || '';
-      if (tab.id && targetUrl && isSuspiciousUrl(targetUrl)) {
-        chrome.tabs.remove(tab.id).catch(() => {});
-        sessionStats.redirectsBlocked++;
-        sessionStats.updatedAt = Date.now();
-      }
-    });
-  }
-
-  if (chrome.tabs.onUpdated) {
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-      const targetUrl = changeInfo.url || tab.pendingUrl || tab.url || '';
-      if (tabId && targetUrl && isSuspiciousUrl(targetUrl)) {
-        chrome.tabs.remove(tabId).catch(() => {});
-        sessionStats.redirectsBlocked++;
-        sessionStats.updatedAt = Date.now();
-      }
-    });
+      return false;
   }
 }
 
-// -------------------------------------------------------------
-// CHROME RAM OPTIMIZER & DISCARD IDLE TABS (Memory Saver)
-// -------------------------------------------------------------
-async function discardIdleTabs(): Promise<number> {
-  if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.tabs.query) {
-    return 0;
-  }
-
-  let count = 0;
-  try {
-    const tabs = await chrome.tabs.query({ active: false, audible: false });
-    for (const tab of tabs) {
-      if (tab.id && !tab.discarded && tab.url && !tab.url.startsWith('chrome://')) {
-        try {
-          await chrome.tabs.discard(tab.id);
-          count++;
-        } catch {
-          // Tab might be playing audio or pinned
-        }
-      }
-    }
-  } catch {}
-  return count;
-}
-
-// Periodic Alarm: Automatically discard idle tabs every 10 minutes to prevent Chrome from eating RAM & Drive C
-if (typeof chrome !== 'undefined' && chrome.alarms) {
-  chrome.alarms.create('shiori_ram_cleaner', { periodInMinutes: 10 });
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'shiori_ram_cleaner') {
-      discardIdleTabs();
-    }
-  });
-}
+chrome.runtime.onMessage.addListener(handleExtensionMessage);

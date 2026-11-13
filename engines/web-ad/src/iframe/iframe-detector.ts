@@ -1,4 +1,4 @@
-import { DetectionResult, generateDetectionId } from '@shiori/shared';
+import { DetectionResult, generateDetectionId, isSameSite } from '@shiori/shared';
 
 export interface IframeScanOptions {
   currentHostname: string;
@@ -61,12 +61,7 @@ export class IframeAdDetector {
       // Check for third-party origin
       try {
         const iframeHost = new URL(src).hostname.toLowerCase();
-        if (
-          iframeHost &&
-          options.currentHostname &&
-          !iframeHost.endsWith(options.currentHostname) &&
-          !options.currentHostname.endsWith(iframeHost)
-        ) {
+        if (iframeHost && options.currentHostname && !isSameSite(iframeHost, options.currentHostname)) {
           confidence += 0.1;
           reasons.push(`Third-party iframe domain: ${iframeHost}`);
         }

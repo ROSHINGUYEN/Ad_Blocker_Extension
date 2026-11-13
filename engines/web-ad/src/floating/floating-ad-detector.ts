@@ -1,4 +1,4 @@
-import { DetectionResult, generateDetectionId } from '@shiori/shared';
+import { DetectionResult, generateDetectionId, isSameSite } from '@shiori/shared';
 
 export class FloatingAdDetector {
   /**
@@ -19,9 +19,10 @@ export class FloatingAdDetector {
     let isAd = false;
     let confidence = 0.0;
 
-    const style = element.style;
+    // Dùng computed style: đa số site đặt position/z-index bằng class CSS, style inline gần như luôn rỗng
+    const style = element.ownerDocument?.defaultView?.getComputedStyle(element) ?? element.style;
     const computedPosition = style.position || '';
-    const zIndex = parseInt(style.zIndex || '0', 10);
+    const zIndex = parseInt(style.zIndex || '0', 10) || 0;
     const bottom = style.bottom;
 
     // 1. Structural Fixed Center Modal Detection (like the UK88 pop-up in middle of screen)
@@ -38,7 +39,7 @@ export class FloatingAdDetector {
           if (!link) continue;
           try {
             const linkHost = new URL(link.href).hostname.toLowerCase();
-            if (linkHost && !linkHost.endsWith(currentHost) && !currentHost.endsWith(linkHost)) {
+            if (linkHost && !isSameSite(linkHost, currentHost)) {
               hasOutboundLink = true;
               break;
             }

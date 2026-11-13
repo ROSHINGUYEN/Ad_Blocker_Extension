@@ -35,13 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ shiori_enabled: isEnabled });
       }
-
-      // Also tell active tab to toggle immediately
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: 'SHIORI_TOGGLE', enabled: isEnabled }).catch(() => {});
-        }
-      });
     });
   }
 
@@ -98,25 +91,32 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 5. Bind RAM Optimizer & Clean Cache button
-  const ramBtn = document.getElementById('btn-ram');
+  const ramBtn = document.getElementById('btn-ram') as HTMLButtonElement | null;
   if (ramBtn) {
-    ramBtn.addEventListener('click', () => {
-      ramBtn.textContent = '⏳ Đang tối ưu...';
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'CLEAN_MEMORY_NOW' }, (memRes) => {
-          chrome.runtime.sendMessage({ type: 'CLEAR_CACHE_NOW' }, () => {
-            const tabsDiscarded = memRes?.count || 0;
-            const tabsClosed = memRes?.closed || 0;
-            if (tabsDiscarded > 0 || tabsClosed > 0) {
-              ramBtn.textContent = `⚡ Đã giải phóng ${tabsDiscarded + tabsClosed} tab!`;
-            } else {
-              ramBtn.textContent = '⚡ Đã dọn sạch đệm RAM & Cache!';
-            }
-            setTimeout(() => {
-              ramBtn.textContent = '⚡ Tối ưu RAM';
-            }, 2500);
-          });
+    const send = <T,>(message: { type: string }) =>
+      new Promise<T | undefined>((resolve) => {
+        chrome.runtime.sendMessage(message, (res: T | undefined) => {
+          void chrome.runtime.lastError; // tránh "Unchecked runtime.lastError"
+          resolve(res);
         });
+      });
+
+    ramBtn.addEventListener('click', async () => {
+      if (ramBtn.disabled) return; // chống bấm đúp
+      ramBtn.disabled = true;
+      ramBtn.textContent = '⏳ Đang tối ưu...';
+      try {
+        const mem = await send<{ count?: number; closed?: number }>({ type: 'CLEAN_MEMORY_NOW' });
+        await send({ type: 'CLEAR_CACHE_NOW' });
+        const total = (mem?.count || 0) + (mem?.closed || 0);
+        ramBtn.textContent = total > 0 ? `⚡ Đã giải phóng ${total} tab!` : '⚡ Đã dọn bộ nhớ đệm!';
+      } catch {
+        ramBtn.textContent = '⚠️ Không thể tối ưu';
+      } finally {
+        setTimeout(() => {
+          ramBtn.textContent = '⚡ Tối ưu RAM';
+          ramBtn.disabled = false;
+        }, 2500);
       }
     });
   }

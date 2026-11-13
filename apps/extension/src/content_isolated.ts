@@ -1,223 +1,120 @@
-import { ShioriWebAdEngine } from '@shiori/web-ad-engine';
-import { ShioriYouTubeEngine } from '@shiori/youtube-engine';
-import { ShioriRuleEngine } from '@shiori/rules-engine';
+/**
+ * Content script (ISOLATED world): CSS "khiên" tức thì + cosmetic CSS từ background + thống kê.
+ *
+ * Đã gỡ khỏi bản cũ:
+ *  - Vòng lặp YouTube 25-50ms (trùng lặp với content_youtube.ts và gây tụt hiệu năng).
+ *  - setInterval 250ms quét toàn DOM trên mọi trang.
+ *  - Selector quá rộng làm ẩn nội dung hợp lệ: a[href*="utm_..."], [class*="adv-"], [class*="bottom-fixed"], ...
+ */
+import { GAMBLING_LABELS } from '@shiori/shared/src/utilities/url-guard';
 
-const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
-const localRuleEngine = new ShioriRuleEngine();
+const SHIELD_ID = 'shiori-instant-shield';
+const COSMETIC_ID = 'shiori-cosmetic-styles';
 
-// Engines initialization
-const webAdEngine = new ShioriWebAdEngine(localRuleEngine, { currentHostname });
-const youTubeEngine = new ShioriYouTubeEngine();
+const SHIELD_SELECTORS: string[] = [
+  '[class*="catfish"]', '[id*="catfish"]',
+  '[class*="popup-banner"]', '[id*="popup-banner"]',
+  '[class*="floating-ad"]', '[id*="floating-ad"]',
+  '[class*="ad-sticky"]', '[id*="ad-sticky"]',
+  '[class*="ads-holder"]', '[id*="ads-holder"]',
+  'a[href*="pc-catfish"]', 'a[href*="topbanner"]',
+  // Link tới domain cờ bạc: neo vào đầu nhãn host để không trúng "sunwind", "logo88"...
+  ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`]),
+  'iframe[src*="popads"]', 'iframe[src*="clickadu"]',
+  // Quảng cáo YouTube ngoài luồng video
+  '.ytp-ad-overlay-container', '.ytp-ad-message-container',
+  'ytd-ad-slot-renderer', '#player-ads', 'ytd-banner-promo-renderer', 'ytd-in-feed-ad-layout-renderer',
+];
 
-let isProtectionEnabled = true;
+const SHIELD_CSS = `${SHIELD_SELECTORS.join(',\n')} {\n  display: none !important;\n  pointer-events: none !important;\n}`;
 
-// Check stored enabled state
-if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-  chrome.storage.local.get(['shiori_enabled'], (res) => {
-    if (res && typeof res.shiori_enabled === 'boolean') {
-      isProtectionEnabled = res.shiori_enabled;
-      toggleProtection(isProtectionEnabled);
-    }
-  });
+const hostname = location.hostname;
+let enabled = true;
+let cosmeticCss = '';
 
-  chrome.storage.onChanged.addListener((changes) => {
-    if (changes.shiori_enabled) {
-      isProtectionEnabled = changes.shiori_enabled.newValue;
-      toggleProtection(isProtectionEnabled);
-    }
-  });
-}
-
-function toggleProtection(enabled: boolean) {
-  const shield = document.getElementById('shiori-instant-shield');
-  const cosmetic = document.getElementById('shiori-cosmetic-styles');
-  if (shield) shield.style.display = enabled ? '' : 'none';
-  if (cosmetic) cosmetic.style.display = enabled ? '' : 'none';
-
-  // Notify main world
-  window.postMessage({ type: 'SHIORI_SET_ENABLED', enabled }, '*');
-}
-
-// Absolute instant shield stylesheet targeting ad banners, catfish, floating popups, sticky footers, and YouTube player ads
-const INLINE_SHIELD_CSS = `
-  [class*="catfish"], [id*="catfish"],
-  [class*="popup-banner"], [id*="popup-banner"],
-  [class*="floating-ad"], [id*="floating-ad"],
-  [class*="bottom-fixed"], [class*="ad-bottom"],
-  [class*="ad-sticky"], [id*="ad-sticky"],
-  [class*="banner-top"], [id*="banner-top"],
-  [class*="banner-center"], [id*="banner-center"],
-  [class*="ads-holder"], [id*="ads-holder"],
-  [class*="adv-"], [id*="adv-"],
-  .ad-center, .banner-center, #banner-center,
-  a[href*="haywin"], a[href*="gemwin"], a[href*="uk88"],
-  a[href*="hitclub"], a[href*="win79"], a[href*="sunwin"],
-  a[href*="yo88"], a[href*="rikvip"], a[href*="go88"],
-  a[href*="bet88"], a[href*="tic88"], a[href*="zowin"],
-  a[href*="6789x.site"], a[href*="cacuoc"],
-  a[href*="topbanner"], a[href*="pc-catfish"], a[href*="cpd"],
-  a[href*="utm_medium"], a[href*="utm_campaign"],
-  iframe[src*="adx"], iframe[src*="catfish"], iframe[src*="banner"],
-  iframe[src*="popads"], iframe[src*="clickadu"],
-  /* YouTube in-stream ad overlays — ẩn toàn bộ banner và viền quảng cáo (KHÔNG ẩn nút skip) */
-  .ytp-ad-message-container,
-  .ytp-ad-text-overlay,
-  .ytp-ad-progress,
-  .ytp-ad-progress-list,
-  .ytp-ad-simple-ad-badge,
-  .ytp-ad-badge,
-  .ytp-ad-preview-container,
-  .ytp-ad-preview-text-container,
-  .ytp-ad-visit-advertiser-button,
-  .ytp-ce-element,
-  ytd-ad-slot-renderer,
-  #player-ads,
-  ytd-banner-promo-renderer,
-  ytd-in-feed-ad-layout-renderer,
-  ytd-promoted-sparkles-web-renderer,
-  #masthead-ad {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    opacity: 0 !important;
-    height: 0 !important;
-    width: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
-`;
-
-function injectShieldStyles(): void {
+function mount(id: string, css: string): void {
+  if (!css || document.getElementById(id)) return;
   const style = document.createElement('style');
-  style.id = 'shiori-instant-shield';
-  style.textContent = INLINE_SHIELD_CSS;
-  if (document.head) {
-    document.head.appendChild(style);
-  } else if (document.documentElement) {
-    document.documentElement.appendChild(style);
+  style.id = id;
+  style.textContent = css;
+  (document.head ?? document.documentElement).appendChild(style);
+}
+
+function unmount(id: string): void {
+  document.getElementById(id)?.remove();
+}
+
+// `style.display = 'none'` KHÔNG vô hiệu hoá thẻ <style> (bản cũ vì vậy không tắt được bộ chặn). Gỡ hẳn node.
+function applyState(): void {
+  if (enabled) {
+    mount(SHIELD_ID, SHIELD_CSS);
+    mount(COSMETIC_ID, cosmeticCss);
+  } else {
+    unmount(SHIELD_ID);
+    unmount(COSMETIC_ID);
   }
 }
 
-export function initializeContentProtection(): void {
-  const isYouTube = currentHostname.includes('youtube.com');
-
-  injectShieldStyles();
-
-  // Listen to messages from content_main (MAIN world) and forward to background
-  window.addEventListener('message', (event) => {
-    if (!isProtectionEnabled) return;
-    if (event.data?.type === 'SHIORI_POPUP_BLOCKED' || event.data?.type === 'SHIORI_CLICK_BLOCKED') {
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'INCREMENT_REDIRECT_BLOCKED' });
-      }
-    }
-  });
-
-  // Get dynamic cosmetic styles from background
-  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-    chrome.runtime.sendMessage(
-      { type: 'GET_COSMETIC_CSS', payload: { hostname: currentHostname } },
-      (response: { css?: string } | undefined) => {
-        if (response?.css) {
-          const style = document.createElement('style');
-          style.id = 'shiori-cosmetic-styles';
-          style.textContent = response.css;
-          document.head?.appendChild(style);
-        }
-      }
-    );
+function send(message: object, cb?: (res: any) => void): void {
+  try {
+    chrome.runtime.sendMessage(message, (res) => {
+      void chrome.runtime.lastError; // nuốt lỗi "receiving end does not exist" khi SW đang khởi động
+      cb?.(res);
+    });
+  } catch {
+    /* extension vừa được reload: context cũ không còn hợp lệ */
   }
+}
 
-  // Active continuous DOM cleaner targeting dynamically injected banners
-  function cleanDynamicPirateBanners(): number {
-    if (!isProtectionEnabled || isYouTube) return 0;
-    let count = 0;
-    const adSelectors = [
-      '[class*="catfish"]', '[id*="catfish"]',
-      '[class*="popup-banner"]', '[id*="popup-banner"]',
-      '[class*="floating-ad"]', '[id*="floating-ad"]',
-      '[class*="banner-top"]', '[id*="banner-top"]',
-      'a[href*="topbanner"]', 'a[href*="pc-catfish"]',
-      'a[href*="utm_medium="]', 'a[href*="gemwin"]', 'a[href*="haywin"]',
-      'a[href*="uk88"]', 'a[href*="yo88"]', 'a[href*="hitclub"]',
-      'a[href*="tic88"]', 'a[href*="zowin"]'
-    ];
+// 1) Hiện khiên NGAY (chống nháy quảng cáo), sau đó đối chiếu với trạng thái đã lưu
+applyState();
+chrome.storage.local.get('shiori_enabled', (r) => {
+  if (typeof r?.shiori_enabled === 'boolean') {
+    enabled = r.shiori_enabled;
+    applyState();
+  }
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.shiori_enabled) {
+    enabled = changes.shiori_enabled.newValue !== false;
+    applyState();
+  }
+});
 
+// 2) Cosmetic CSS từ rule engine (ở background)
+send({ type: 'GET_COSMETIC_CSS', payload: { hostname } }, (res) => {
+  if (typeof res?.css === 'string') {
+    cosmeticCss = res.css;
+    if (enabled) mount(COSMETIC_ID, cosmeticCss);
+  }
+});
+
+// 3) Thống kê từ script MAIN-world — gộp lô, tối đa 1 tin/giây, chỉ nhận từ chính window này
+let pendingBlocked = 0;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+window.addEventListener('message', (event) => {
+  if (event.source !== window || !enabled) return;
+  const d = event.data;
+  if (d?.source !== 'shiori-main' || (d.type !== 'SHIORI_POPUP_BLOCKED' && d.type !== 'SHIORI_CLICK_BLOCKED')) return;
+  pendingBlocked++;
+  flushTimer ??= setTimeout(() => {
+    send({ type: 'INCREMENT_REDIRECT_BLOCKED', payload: { count: pendingBlocked } });
+    pendingBlocked = 0;
+    flushTimer = null;
+  }, 1000);
+});
+
+// 4) Đếm số phần tử bị khiên ẩn — đúng MỘT lần sau khi tải xong, lúc trình duyệt rảnh
+window.addEventListener('load', () => {
+  const run = () => {
+    if (!enabled) return;
     try {
-      const elements = document.querySelectorAll<HTMLElement>(adSelectors.join(','));
-      elements.forEach((el) => {
-        // Also remove parent container if it's an ad wrapper
-        const parent = el.parentElement;
-        if (parent && parent !== document.body && parent.querySelectorAll('a').length === 1 && parent.clientHeight < 250) {
-          if (parent.style.display !== 'none') {
-            parent.style.display = 'none';
-            parent.style.visibility = 'hidden';
-            parent.style.pointerEvents = 'none';
-            count++;
-          }
-        }
-        if (el.style.display !== 'none') {
-          el.style.display = 'none';
-          el.style.visibility = 'hidden';
-          el.style.pointerEvents = 'none';
-          count++;
-        }
-      });
-    } catch {}
-
-    return count;
-  }
-
-  // Initial and live DOM scanning
-  if (typeof document !== 'undefined') {
-    if (document.body) {
-      runScan();
-    } else {
-      document.addEventListener('DOMContentLoaded', runScan);
+      const n = document.querySelectorAll(SHIELD_SELECTORS.join(',')).length;
+      if (n > 0) send({ type: 'INCREMENT_DOM_HIDDEN', payload: { count: n } });
+    } catch {
+      /* selector không hợp lệ không được làm hỏng trang */
     }
-  }
-
-  function runScan(): void {
-    if (isYouTube) {
-      const container = document.getElementById('movie_player') || document.body;
-      const video = document.querySelector('video');
-      const ytDetections = youTubeEngine.evaluateState(container, video);
-
-      if (ytDetections.length > 0 && typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.sendMessage({
-          type: 'INCREMENT_DOM_HIDDEN',
-          payload: { count: ytDetections.length },
-        });
-      }
-    } else {
-      const detections = webAdEngine.scanAndClean(document.body);
-      const dynamicCount = cleanDynamicPirateBanners();
-      const totalCount = detections.length + dynamicCount;
-
-      if (totalCount > 0 && typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.sendMessage({
-          type: 'INCREMENT_DOM_HIDDEN',
-          payload: { count: totalCount },
-        });
-      }
-
-      webAdEngine.startLiveMonitoring(document.body);
-
-      // Continuous high-frequency sweep for dynamic script injections
-      setInterval(() => {
-        if (!isProtectionEnabled) return;
-        const swept = cleanDynamicPirateBanners();
-        if (swept > 0 && typeof chrome !== 'undefined' && chrome.runtime) {
-          chrome.runtime.sendMessage({
-            type: 'INCREMENT_DOM_HIDDEN',
-            payload: { count: swept },
-          });
-        }
-      }, 250);
-    }
-  }
-}
-
-if (typeof window !== 'undefined') {
-  initializeContentProtection();
-}
+  };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 3000 });
+  else setTimeout(run, 1500);
+}, { once: true });

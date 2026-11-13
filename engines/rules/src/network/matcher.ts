@@ -10,8 +10,24 @@ export class NetworkRuleMatcher {
 
     // Standard adblock pattern: ||example.com^
     if (rule.pattern.startsWith('||')) {
-      const cleanPattern = rule.pattern.replace(/^\|\|/, '').replace(/\^.*$/, '');
-      this.domainTrie.insertDomainRule(cleanPattern, rule);
+      const body = rule.pattern.slice(2);
+      const hostPart = body.replace(/[\^/*?:].*$/, '');
+      const hasPathOrWildcard = /[/*?]/.test(body.replace(/\^$/, ''));
+      if (hostPart && !hasPathOrWildcard) {
+        // Thuần domain: dùng trie (O(số nhãn))
+        this.domainTrie.insertDomainRule(hostPart, rule);
+      } else {
+        // `||host/path`, `||ads*.example.com^`: neo ở đầu hostname rồi dùng regex
+        const escaped = body
+          .replace(/([.+?$|{}()[\]\\])/g, '\\$1')
+          .replace(/\*/g, '.*')
+          .replace(/\^/g, '([/:?&=]|$)');
+        try {
+          this.wildcardRules.push({ regex: new RegExp(`^https?://([^/?#]*\\.)?${escaped}`, 'i'), rule });
+        } catch {
+          // Bỏ qua regex không hợp lệ
+        }
+      }
     } else if (rule.pattern.includes('*') || rule.pattern.includes('^')) {
       // Regex conversion for wildcards
       let escaped = rule.pattern
@@ -26,9 +42,13 @@ export class NetworkRuleMatcher {
       }
     } else {
       // Direct string substring match
+      if (!rule.pattern) return; // pattern rỗng sẽ khớp MỌI URL
       const escaped = rule.pattern.replace(/([.+?${}()|[\]\\])/g, '\\$1');
-      const regex = new RegExp(escaped, 'i');
-      this.wildcardRules.push({ regex, rule });
+      try {
+        this.wildcardRules.push({ regex: new RegExp(escaped, 'i'), rule });
+      } catch {
+        // Bỏ qua
+      }
     }
   }
 

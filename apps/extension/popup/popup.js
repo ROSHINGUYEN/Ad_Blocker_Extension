@@ -31,12 +31,6 @@
         if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
           chrome.storage.local.set({ shiori_enabled: isEnabled });
         }
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: "SHIORI_TOGGLE", enabled: isEnabled }).catch(() => {
-            });
-          }
-        });
       });
     }
     if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
@@ -84,23 +78,28 @@
     }
     const ramBtn = document.getElementById("btn-ram");
     if (ramBtn) {
-      ramBtn.addEventListener("click", () => {
+      const send = (message) => new Promise((resolve) => {
+        chrome.runtime.sendMessage(message, (res) => {
+          void chrome.runtime.lastError;
+          resolve(res);
+        });
+      });
+      ramBtn.addEventListener("click", async () => {
+        if (ramBtn.disabled) return;
+        ramBtn.disabled = true;
         ramBtn.textContent = "\u23F3 \u0110ang t\u1ED1i \u01B0u...";
-        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-          chrome.runtime.sendMessage({ type: "CLEAN_MEMORY_NOW" }, (memRes) => {
-            chrome.runtime.sendMessage({ type: "CLEAR_CACHE_NOW" }, () => {
-              const tabsDiscarded = memRes?.count || 0;
-              const tabsClosed = memRes?.closed || 0;
-              if (tabsDiscarded > 0 || tabsClosed > 0) {
-                ramBtn.textContent = `\u26A1 \u0110\xE3 gi\u1EA3i ph\xF3ng ${tabsDiscarded + tabsClosed} tab!`;
-              } else {
-                ramBtn.textContent = "\u26A1 \u0110\xE3 d\u1ECDn s\u1EA1ch \u0111\u1EC7m RAM & Cache!";
-              }
-              setTimeout(() => {
-                ramBtn.textContent = "\u26A1 T\u1ED1i \u01B0u RAM";
-              }, 2500);
-            });
-          });
+        try {
+          const mem = await send({ type: "CLEAN_MEMORY_NOW" });
+          await send({ type: "CLEAR_CACHE_NOW" });
+          const total = (mem?.count || 0) + (mem?.closed || 0);
+          ramBtn.textContent = total > 0 ? `\u26A1 \u0110\xE3 gi\u1EA3i ph\xF3ng ${total} tab!` : "\u26A1 \u0110\xE3 d\u1ECDn b\u1ED9 nh\u1EDB \u0111\u1EC7m!";
+        } catch {
+          ramBtn.textContent = "\u26A0\uFE0F Kh\xF4ng th\u1EC3 t\u1ED1i \u01B0u";
+        } finally {
+          setTimeout(() => {
+            ramBtn.textContent = "\u26A1 T\u1ED1i \u01B0u RAM";
+            ramBtn.disabled = false;
+          }, 2500);
         }
       });
     }

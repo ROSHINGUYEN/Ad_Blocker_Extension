@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ad Blocker Extension",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Smart Ad Blocking & Browser Protection - Clean Browsing. Smart Detection. User Privacy.",
   "icons": {
     "16": "icons/icon16.png",
@@ -12,11 +12,8 @@
   "permissions": [
     "storage",
     "declarativeNetRequest",
-    "declarativeNetRequestFeedback",
     "webNavigation",
-    "tabs",
     "scripting",
-    "alarms",
     "browsingData"
   ],
   "host_permissions": [
@@ -37,15 +34,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["dist/content_isolated.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content_isolated.js"
+      ],
       "run_at": "document_start"
-    },
-    {
-      "matches": ["<all_urls>"],
-      "js": ["dist/content_main.js"],
-      "run_at": "document_start",
-      "world": "MAIN"
     }
   ],
   "action": {
@@ -56,5 +51,6 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
-  }
+  },
+  "minimum_chrome_version": "111"
 }

@@ -2,59 +2,45 @@ import { build } from 'esbuild';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const production = process.env.NODE_ENV === 'production';
 
-async function bundleExtension() {
-  console.log('Building SHIORI AD CLEANER Chrome Extension (MV3)...');
+/** Mỗi entry: [nguồn, đích, format]. Service worker dùng ESM; content script & popup dùng IIFE. */
+const ENTRIES = [
+  ['src/background.ts', 'dist/background.js', 'esm'],
+  ['src/content_isolated.ts', 'dist/content_isolated.js', 'iife'],
+  ['src/content_main.ts', 'dist/content_main.js', 'iife'],
+  ['src/content_youtube.ts', 'dist/content_youtube.js', 'iife'],
+  ['popup/popup.ts', 'popup/popup.js', 'iife'],
+];
 
-  // 1. Bundle Background Service Worker
-  await build({
-    entryPoints: [resolve(__dirname, 'src/background.ts')],
-    outfile: resolve(__dirname, 'dist/background.js'),
-    bundle: true,
-    format: 'esm',
-    target: 'es2022',
-    minify: false,
-    sourcemap: true,
+console.log(`Building Ad Blocker Extension (MV3)${production ? ' [production]' : ''}...`);
+
+try {
+  // Chạy song song; metafile để in kích thước (content script chạy trên MỌI trang nên phải nhỏ)
+  const results = await Promise.all(
+    ENTRIES.map(([src, out, format]) =>
+      build({
+        entryPoints: [resolve(__dirname, src)],
+        outfile: resolve(__dirname, out),
+        bundle: true,
+        format,
+        target: 'es2022',
+        minify: production,
+        sourcemap: production ? false : out.startsWith('dist/'),
+        legalComments: 'none',
+        metafile: true,
+        logLevel: 'warning',
+      })
+    )
+  );
+  results.forEach((r, i) => {
+    const [, out] = ENTRIES[i];
+    const bytes = Object.values(r.metafile.outputs).reduce((n, o) => n + o.bytes, 0);
+    console.log(`  ${out.padEnd(28)} ${(bytes / 1024).toFixed(1)} KB`);
   });
-
-  // 2. Bundle Content Scripts
-  await build({
-    entryPoints: [resolve(__dirname, 'src/content_isolated.ts')],
-    outfile: resolve(__dirname, 'dist/content_isolated.js'),
-    bundle: true,
-    format: 'iife',
-    target: 'es2022',
-    minify: false,
-    sourcemap: true,
-  });
-
-  await build({
-    entryPoints: [resolve(__dirname, 'src/content_main.ts')],
-    outfile: resolve(__dirname, 'dist/content_main.js'),
-    bundle: true,
-    format: 'iife',
-    target: 'es2022',
-    minify: false,
-    sourcemap: true,
-  });
-
-  // 3. Bundle Popup Script
-  await build({
-    entryPoints: [resolve(__dirname, 'popup/popup.ts')],
-    outfile: resolve(__dirname, 'popup/popup.js'),
-    bundle: true,
-    format: 'iife',
-    target: 'es2022',
-    minify: false,
-    sourcemap: false,
-  });
-
-  console.log('Build completed successfully! Artifacts ready in apps/extension/dist/ & popup/');
-}
-
-bundleExtension().catch((err) => {
+  console.log('Build completed. Load apps/extension as an unpacked extension.');
+} catch (err) {
   console.error('Build failed:', err);
   process.exit(1);
-});
+}

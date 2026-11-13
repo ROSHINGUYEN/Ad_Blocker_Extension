@@ -51,9 +51,31 @@ export class CosmeticRuleManager {
       return '';
     }
 
-    // CSS injection for cosmetic hiding with display none !important
-    const combinedSelector = Array.from(selectors).join(',\n');
-    return `${combinedSelector} {\n  display: none !important;\n}`;
+    // Một selector sai làm trình duyệt bỏ CẢ rule (selector list), nên chia thành các khối nhỏ.
+    // Nếu một khối lỗi thì chỉ mất khối đó; selector chứa ký tự phá cú pháp CSS bị loại.
+    const safe = Array.from(selectors).filter(CosmeticRuleManager.isSafeSelector);
+    const CHUNK = 20;
+    const blocks: string[] = [];
+    for (let i = 0; i < safe.length; i += CHUNK) {
+      blocks.push(`${safe.slice(i, i + CHUNK).join(',\n')} {\n  display: none !important;\n}`);
+    }
+    return blocks.join('\n');
+  }
+
+  /** Chặn CSS-injection từ rule package: không cho `{ } ; @ <` và dấu ngoặc mất cân bằng. */
+  private static isSafeSelector(selector: string): boolean {
+    if (!selector || selector.length > 500) return false;
+    if (/[{};@<>\\]/.test(selector)) return false;
+    let round = 0;
+    let square = 0;
+    for (const ch of selector) {
+      if (ch === '(') round++;
+      else if (ch === ')') round--;
+      else if (ch === '[') square++;
+      else if (ch === ']') square--;
+      if (round < 0 || square < 0) return false;
+    }
+    return round === 0 && square === 0;
   }
 
   private isDomainExcluded(rule: CosmeticRule, hostname: string): boolean {
