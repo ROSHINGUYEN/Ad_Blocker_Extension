@@ -20,6 +20,9 @@ importers:
       '@shiori/intelligence-engine':
         specifier: workspace:*
         version: link:../../engines/intelligence
+      '@shiori/redirect-guard':
+        specifier: workspace:*
+        version: link:../../engines/redirect
       '@shiori/rules-engine':
         specifier: workspace:*
         version: link:../../engines/rules
@@ -74,6 +77,19 @@ importers:
       happy-dom:
         specifier: ^17.4.4
         version: 17.6.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@26.6.6)(happy-dom@17.6.3)
+
+  engines/redirect:
+    dependencies:
+      '@shiori/shared':
+        specifier: workspace:*
+        version: link:../../shared
+    devDependencies:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

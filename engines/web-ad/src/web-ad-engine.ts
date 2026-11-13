@@ -2,6 +2,7 @@ import { DetectionResult } from '@shiori/shared';
 import { ShioriRuleEngine } from '@shiori/rules-engine';
 import { IframeAdDetector } from './iframe/iframe-detector';
 import { NativeAdDetector } from './native/native-detector';
+import { FloatingAdDetector } from './floating/floating-ad-detector';
 import { DOMRestorationManager } from './dom/dom-restoration';
 import { SafeDOMObserver } from './dom/dom-observer';
 
@@ -10,11 +11,13 @@ export interface WebAdEngineConfig {
   enableCosmeticStyles?: boolean;
   enableIframeScanning?: boolean;
   enableNativeAdScanning?: boolean;
+  enableFloatingAdScanning?: boolean;
 }
 
 export class ShioriWebAdEngine {
   private iframeDetector = new IframeAdDetector();
   private nativeDetector = new NativeAdDetector();
+  private floatingDetector = new FloatingAdDetector();
   public restorationManager = new DOMRestorationManager();
   private observer: SafeDOMObserver | null = null;
 
@@ -43,7 +46,29 @@ export class ShioriWebAdEngine {
       });
     }
 
-    // 2. Scan Native / Sponsored Widgets
+    // 2. Scan Floating Modals, Sticky Bottom Bars & Gambling Links
+    if (this.config.enableFloatingAdScanning !== false) {
+      // Check the rootElement itself if it matches floating ad criteria
+      const rootFloating = this.floatingDetector.analyzeElement(rootElement);
+      if (rootFloating && rootFloating.recommendedAction === 'HIDE') {
+        this.restorationManager.hideElement(rootElement, rootFloating.evidence.reasons.join(', '));
+        detections.push(rootFloating);
+      }
+
+      // Check candidate elements inside
+      const floatingCandidates = rootElement.querySelectorAll<HTMLElement>(
+        'div, aside, section, a[href*="http"], [class*="popup"], [class*="banner"], [class*="floating"], [id*="popup"], [id*="banner"]'
+      );
+      floatingCandidates.forEach((el) => {
+        const result = this.floatingDetector.analyzeElement(el);
+        if (result && result.recommendedAction === 'HIDE') {
+          this.restorationManager.hideElement(el, result.evidence.reasons.join(', '));
+          detections.push(result);
+        }
+      });
+    }
+
+    // 3. Scan Native / Sponsored Widgets
     if (this.config.enableNativeAdScanning !== false) {
       const candidates = rootElement.querySelectorAll<HTMLElement>(
         '[class*="sponsor"], [class*="advert"], [id*="sponsor"], [id*="advert"], [class*="taboola"], [class*="outbrain"]'
