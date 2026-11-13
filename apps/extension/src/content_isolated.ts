@@ -166,6 +166,39 @@ export function initializeContentProtection(): void {
 
   function runScan(): void {
     if (isYouTube) {
+      // In-stream YouTube ad active terminator loop in isolated world
+      function sweepYouTubeAds() {
+        if (!isProtectionEnabled) return;
+        const adPlayer = document.querySelector('.ad-showing, .ad-interrupting, [class*="ytp-ad-module"]');
+        const video = document.querySelector('video') as HTMLVideoElement | null;
+        if (adPlayer && video) {
+          // 1. Mute ad instantly
+          video.muted = true;
+          // 2. Fast forward ad straight to end
+          if (video.duration && isFinite(video.duration) && video.duration > 0) {
+            video.playbackRate = 16.0;
+            video.currentTime = video.duration;
+          }
+          // 3. Auto click skip button
+          const skipBtn = document.querySelector<HTMLElement>(
+            '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button, .videoAdUiSkipButton, [class*="skip-button"]'
+          );
+          if (skipBtn) {
+            skipBtn.click();
+          }
+        }
+      }
+
+      setInterval(sweepYouTubeAds, 50);
+
+      const observer = new MutationObserver(sweepYouTubeAds);
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class']
+      });
+
       const container = document.getElementById('movie_player') || document.body;
       const video = document.querySelector('video');
       const ytDetections = youTubeEngine.evaluateState(container, video);
