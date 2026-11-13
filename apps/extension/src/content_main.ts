@@ -12,7 +12,7 @@
     }
   });
 
-  // 1. YouTube Auto-Skip Engine
+  // 1. Synthetic mouse event dispatcher targeting element center
   function dispatchClick(el: HTMLElement) {
     try {
       const rect = el.getBoundingClientRect();
@@ -41,22 +41,32 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // CHECK CHÍNH XÁC 100%: Chỉ can thiệp khi YouTube có class ad-showing hoặc ad-interrupting
-    const isRealAdPlaying =
+    // Detect YouTube Ad State (class on player OR ad badges OR overlay text/container)
+    const isAdPlaying =
       player.classList?.contains('ad-showing') ||
-      player.classList?.contains('ad-interrupting');
+      player.classList?.contains('ad-interrupting') ||
+      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module, ytd-ad-slot-renderer, .ytp-ad-badge, [class*="ytp-ad-"], [class*="skip-button"]'));
 
-    if (isRealAdPlaying) {
-      // 1. Tắt tiếng ad để không làm phiền người dùng
+    if (isAdPlaying) {
+      // 1. Mute ad immediately
       video.muted = true;
 
-      // 2. Click nút Skip Ad ngay lập tức (KHÔNG TUA VIDEO BẰNG PLAYBACKRATE HOẶC CURRENTTIME NỮA ĐỂ TRÁNH LỖI)
+      // 2. Safe ad fast-forward: ONLY if ad duration is short (e.g. <= 90s)
+      if (video.duration && isFinite(video.duration) && video.duration <= 90) {
+        video.playbackRate = 16.0;
+        if (video.currentTime < video.duration - 0.2) {
+          video.currentTime = video.duration - 0.1;
+        }
+      }
+
+      // 3. Trigger YouTube internal skip API
       try {
         if (typeof player.skipAd === 'function') {
           player.skipAd();
         }
       } catch {}
 
+      // 4. Click all skip button variants
       const skipSelectors = [
         '.ytp-ad-skip-button-modern',
         '.ytp-skip-ad-button',
@@ -65,7 +75,8 @@
         'button.ytp-ad-skip-button-text',
         '.ytp-ad-skip-button-container button',
         '.videoAdUiSkipButton',
-        '[class*="skip-button"]'
+        '[class*="skip-button"]',
+        'div.ytp-ad-text'
       ];
 
       for (const sel of skipSelectors) {
@@ -75,8 +86,8 @@
         });
       }
 
-      // Quét thêm bất kỳ button nào có chữ "Bỏ qua" hoặc "Skip"
-      const allButtons = document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text');
+      // Click any button containing Skip / Bỏ qua
+      const allButtons = document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text, button[id*="skip"]');
       allButtons.forEach((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
         if (txt.includes('bỏ qua') || txt.includes('skip')) {
@@ -84,15 +95,27 @@
         }
       });
     } else {
-      // TUYỆT ĐỐI KHÔNG CAN THIỆP KHI VIDEO CHÍNH ĐANG PHÁT: Giữ nguyên tốc độ chuẩn của người dùng
+      // Restore normal playback for the main video
       if (video.playbackRate > 2.0) {
         video.playbackRate = 1.0;
       }
     }
   }
 
-  // Quét định kỳ 100ms
-  setInterval(handleYouTubeAdState, 100);
+  // Polling loop every 50ms
+  setInterval(handleYouTubeAdState, 50);
+
+  document.addEventListener('play', (e) => {
+    if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
+      handleYouTubeAdState();
+    }
+  }, true);
+
+  document.addEventListener('timeupdate', (e) => {
+    if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
+      handleYouTubeAdState();
+    }
+  }, true);
 
   window.addEventListener('yt-navigate-finish', () => {
     handleYouTubeAdState();
