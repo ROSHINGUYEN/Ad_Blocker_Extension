@@ -9,7 +9,7 @@ const localRuleEngine = new ShioriRuleEngine();
 const webAdEngine = new ShioriWebAdEngine(localRuleEngine, { currentHostname });
 const youTubeEngine = new ShioriYouTubeEngine();
 
-// Instant shield stylesheet targeting ad banners, catfish, floating popups, sticky footers, and YouTube player ads
+// Absolute instant shield stylesheet targeting ad banners, catfish, floating popups, sticky footers, and YouTube player ads
 const INLINE_SHIELD_CSS = `
   [class*="catfish"], [id*="catfish"],
   [class*="popup-banner"], [id*="popup-banner"],
@@ -24,9 +24,9 @@ const INLINE_SHIELD_CSS = `
   a[href*="haywin"], a[href*="gemwin"], a[href*="uk88"],
   a[href*="hitclub"], a[href*="win79"], a[href*="sunwin"],
   a[href*="yo88"], a[href*="rikvip"], a[href*="go88"],
-  a[href*="bet88"], a[href*="6789x.site"], a[href*="cacuoc"],
-  a[href*="utm_medium=topbanner"], a[href*="utm_medium=pc-catfish"],
-  a[href*="utm_campaign=cpd"],
+  a[href*="bet88"], a[href*="tic88"], a[href*="6789x.site"], a[href*="cacuoc"],
+  a[href*="topbanner"], a[href*="pc-catfish"], a[href*="cpd"],
+  a[href*="utm_medium"], a[href*="utm_campaign"],
   iframe[src*="adx"], iframe[src*="catfish"], iframe[src*="banner"],
   iframe[src*="popads"], iframe[src*="clickadu"],
   /* YouTube ad containers overlay */
@@ -39,6 +39,7 @@ const INLINE_SHIELD_CSS = `
     opacity: 0 !important;
     height: 0 !important;
     width: 0 !important;
+    max-height: 0 !important;
     overflow: hidden !important;
   }
 `;
@@ -92,13 +93,24 @@ export function initializeContentProtection(): void {
       '[class*="popup-banner"]', '[id*="popup-banner"]',
       '[class*="floating-ad"]', '[id*="floating-ad"]',
       '[class*="banner-top"]', '[id*="banner-top"]',
+      'a[href*="topbanner"]', 'a[href*="pc-catfish"]',
       'a[href*="utm_medium="]', 'a[href*="gemwin"]', 'a[href*="haywin"]',
-      'a[href*="uk88"]', 'a[href*="yo88"]', 'a[href*="hitclub"]'
+      'a[href*="uk88"]', 'a[href*="yo88"]', 'a[href*="hitclub"]', 'a[href*="tic88"]'
     ];
 
     try {
       const elements = document.querySelectorAll<HTMLElement>(adSelectors.join(','));
       elements.forEach((el) => {
+        // Also remove parent container if it's an ad wrapper
+        const parent = el.parentElement;
+        if (parent && parent !== document.body && parent.querySelectorAll('a').length === 1 && parent.clientHeight < 200) {
+          if (parent.style.display !== 'none') {
+            parent.style.display = 'none';
+            parent.style.visibility = 'hidden';
+            parent.style.pointerEvents = 'none';
+            count++;
+          }
+        }
         if (el.style.display !== 'none') {
           el.style.display = 'none';
           el.style.visibility = 'hidden';
@@ -163,7 +175,7 @@ export function initializeContentProtection(): void {
             payload: { count: swept },
           });
         }
-      }, 500);
+      }, 250);
     }
   }
 }

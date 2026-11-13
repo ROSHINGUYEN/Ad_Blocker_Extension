@@ -96,9 +96,11 @@
     if (!href) return false;
     const lower = href.toLowerCase();
     return (
-      lower.includes('utm_medium=topbanner') ||
-      lower.includes('utm_medium=pc-catfish') ||
-      lower.includes('utm_campaign=cpd') ||
+      lower.includes('topbanner') ||
+      lower.includes('catfish') ||
+      lower.includes('utm_medium') ||
+      lower.includes('utm_campaign') ||
+      lower.includes('cpd') ||
       lower.includes('gemwin') ||
       lower.includes('haywin') ||
       lower.includes('uk88') ||
@@ -109,6 +111,7 @@
       lower.includes('rikvip') ||
       lower.includes('go88') ||
       lower.includes('bet88') ||
+      lower.includes('tic88') ||
       lower.includes('6789x.site') ||
       lower.includes('cacuoc') ||
       lower.includes('gamebai') ||
@@ -143,7 +146,7 @@
     }
   }
 
-  // Intercept at all critical stages of the click pipeline
+  // Intercept at all critical stages of the click pipeline (Capture phase)
   window.addEventListener('pointerdown', interceptPotentialAdTrigger, true);
   window.addEventListener('mousedown', interceptPotentialAdTrigger, true);
   window.addEventListener('click', interceptPotentialAdTrigger, true);
