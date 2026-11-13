@@ -5,6 +5,8 @@
   <br/>
   <h3>Trình Chặn Quảng Cáo Thông Minh, Bảo Vệ Trình Duyệt & Tối Ưu Bộ Nhớ RAM</h3>
   <p><strong>Duyệt web sạch • Tự động bỏ qua quảng cáo YouTube • Bảo vệ quyền riêng tư tuyệt đối</strong></p>
+  <br/>
+  <img src="docs/demo_popup.png" width="340" alt="Giao diện bảng điều khiển Ad Blocker Extension" style="border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);" />
 </div>
 
 ---
