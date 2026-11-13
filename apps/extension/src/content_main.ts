@@ -35,10 +35,13 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // Strict YouTube ad detection: player must have ad-showing or ad-interrupting class
+    // Comprehensive YouTube Ad Detection:
+    // 1. Player class contains ad-showing / ad-interrupting
+    // 2. Or ad badges / overlays are present on screen (like "Được tài trợ", .ytp-ad-player-overlay, etc.)
     const isAdPlaying =
       player.classList?.contains('ad-showing') ||
-      player.classList?.contains('ad-interrupting');
+      player.classList?.contains('ad-interrupting') ||
+      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module, ytd-ad-slot-renderer, .ytp-ad-badge, [class*="ytp-ad-"]'));
 
     if (isAdPlaying) {
       if (!handlingAd) {
@@ -50,15 +53,25 @@
       // 1. Mute ad immediately
       video.muted = true;
 
-      // 2. Fast-forward ad to avoid user waiting
+      // 2. Fast-forward ad at 16x speed
       video.playbackRate = 16.0;
 
-      // 3. Only seek ad video, and check duration safely
-      if (video.duration && isFinite(video.duration) && video.duration < 300) {
-        video.currentTime = video.duration;
+      // 3. Jump to end of ad
+      if (video.duration && isFinite(video.duration)) {
+        // Only jump if duration is within standard ad bounds (e.g. <= 120s) or current time is not yet at duration
+        if (video.duration <= 120 && video.currentTime < video.duration) {
+          video.currentTime = video.duration;
+        }
       }
 
-      // 4. Dispatch synthetic click on all skip ad button variants
+      // 4. Force trigger YouTube player's internal skip API if available
+      try {
+        if (typeof player.skipAd === 'function') {
+          player.skipAd();
+        }
+      } catch {}
+
+      // 5. Dispatch synthetic click on all skip ad button variants
       const skipSelectors = [
         '.ytp-ad-skip-button',
         '.ytp-ad-skip-button-modern',
@@ -66,12 +79,13 @@
         '.ytp-skip-ad-button',
         '.ytp-ad-skip-button-slot button',
         'button[id*="skip"]',
-        '.videoAdUiSkipButton'
+        '.videoAdUiSkipButton',
+        '[class*="skip-button"]'
       ];
 
       for (const sel of skipSelectors) {
         const btn = document.querySelector(sel) as HTMLElement | null;
-        if (btn && btn.offsetParent !== null) { // must be visible
+        if (btn) {
           dispatchSyntheticClick(btn);
           break;
         }
@@ -86,11 +100,17 @@
     }
   }
 
-  // Interval check every 100ms
-  setInterval(handleYouTubeAdState, 100);
+  // High-frequency polling loop: checks every 50ms for instantaneous ad suppression
+  setInterval(handleYouTubeAdState, 50);
 
   // Hook into video element playback events
   document.addEventListener('play', (e) => {
+    if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
+      handleYouTubeAdState();
+    }
+  }, true);
+
+  document.addEventListener('timeupdate', (e) => {
     if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
       handleYouTubeAdState();
     }
