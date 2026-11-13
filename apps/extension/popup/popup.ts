@@ -96,4 +96,22 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // 5. Bind RAM Optimizer & Clean Cache button
+  const ramBtn = document.getElementById('btn-ram');
+  if (ramBtn) {
+    ramBtn.addEventListener('click', () => {
+      ramBtn.textContent = '⏳ Đang dọn...';
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({ type: 'CLEAN_MEMORY_NOW' }, (res) => {
+          chrome.runtime.sendMessage({ type: 'CLEAR_CACHE_NOW' }, () => {
+            ramBtn.textContent = `⚡ Đã dọn ${res?.count || 0} tab!`;
+            setTimeout(() => {
+              ramBtn.textContent = '⚡ Tối ưu RAM';
+            }, 2000);
+          });
+        });
+      }
+    });
+  }
 });

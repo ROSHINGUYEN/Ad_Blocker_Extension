@@ -157,7 +157,7 @@
     "priority": 1,
     "action": { "type": "block" },
     "condition": {
-      "urlFilter": "||popads.net",
+      "urlFilter": "||zowin.",
       "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
     }
   },
@@ -166,7 +166,7 @@
     "priority": 1,
     "action": { "type": "block" },
     "condition": {
-      "urlFilter": "||clickadu.com",
+      "urlFilter": "||popads.net",
       "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
     }
   },
@@ -175,7 +175,7 @@
     "priority": 1,
     "action": { "type": "block" },
     "condition": {
-      "urlFilter": "||adsterra.com",
+      "urlFilter": "||clickadu.com",
       "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
     }
   },
@@ -184,8 +184,80 @@
     "priority": 1,
     "action": { "type": "block" },
     "condition": {
+      "urlFilter": "||adsterra.com",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 22,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
       "urlFilter": "||propellerads.com",
       "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 23,
+    "priority": 2,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*pornhub*",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 24,
+    "priority": 2,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*xvideos*",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 25,
+    "priority": 2,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*xnxx*",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 26,
+    "priority": 2,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*hentai*",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 27,
+    "priority": 2,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*vlxx*",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 28,
+    "priority": 2,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*phimsex*",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 29,
+    "priority": 2,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*sex*",
+      "resourceTypes": ["main_frame", "sub_frame"]
     }
   }
 ]

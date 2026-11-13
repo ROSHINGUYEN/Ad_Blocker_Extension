@@ -8,13 +8,16 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "incognito": "spanning",
   "permissions": [
     "storage",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "webNavigation",
     "tabs",
-    "scripting"
+    "scripting",
+    "alarms",
+    "browsingData"
   ],
   "host_permissions": [
     "<all_urls>"

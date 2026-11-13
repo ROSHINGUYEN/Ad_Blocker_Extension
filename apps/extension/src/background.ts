@@ -39,6 +39,12 @@ ruleEngine.loadFromRawText(`
 ||rikvip^
 ||go88^
 ||bet88^
+||tic88^
+||zowin^
+||pornhub^
+||xvideos^
+||xnxx^
+||vlxx^
 ##.ad-banner
 ##.sponsor-card
 ##.popup-banner
@@ -72,6 +78,24 @@ export function handleExtensionMessage(
       sessionStats.updatedAt = Date.now();
       sendResponse({ success: true, count: sessionStats.redirectsBlocked });
       break;
+
+    case 'CLEAN_MEMORY_NOW': {
+      discardIdleTabs().then((discardedCount) => {
+        sendResponse({ success: true, count: discardedCount });
+      });
+      return true;
+    }
+
+    case 'CLEAR_CACHE_NOW': {
+      if (typeof chrome !== 'undefined' && chrome.browsingData) {
+        chrome.browsingData.removeCache({}, () => {
+          sendResponse({ success: true });
+        });
+        return true;
+      }
+      sendResponse({ success: false });
+      break;
+    }
 
     case 'EVALUATE_URL': {
       const url = message.payload?.url;
@@ -112,7 +136,7 @@ if (typeof chrome !== 'undefined' && chrome.declarativeNetRequest && chrome.decl
   });
 }
 
-// Check if a URL matches malicious/ad patterns
+// Check if a URL matches malicious, gambling, or adult patterns
 function isSuspiciousUrl(url: string): boolean {
   if (!url || url === 'about:blank') return false;
   const lower = url.toLowerCase();
@@ -130,6 +154,8 @@ function isSuspiciousUrl(url: string): boolean {
     lower.includes('rikvip') ||
     lower.includes('go88') ||
     lower.includes('bet88') ||
+    lower.includes('tic88') ||
+    lower.includes('zowin') ||
     lower.includes('6789x.site') ||
     lower.includes('cacuoc') ||
     lower.includes('gamebai') ||
@@ -137,14 +163,20 @@ function isSuspiciousUrl(url: string): boolean {
     lower.includes('popads') ||
     lower.includes('clickadu') ||
     lower.includes('adsterra') ||
-    lower.includes('propellerads')
+    lower.includes('propellerads') ||
+    lower.includes('pornhub') ||
+    lower.includes('xvideos') ||
+    lower.includes('xnxx') ||
+    lower.includes('hentai') ||
+    lower.includes('vlxx') ||
+    lower.includes('phimsex') ||
+    lower.includes('sex')
   );
 }
 
-// 0MS ZERO-LATENCY INTERCEPTION: Kill tab before navigation occurs!
+// 0MS ZERO-LATENCY INTERCEPTION: Kill tab before navigation occurs (Spans Incognito tabs too!)
 if (typeof chrome !== 'undefined' && chrome.webNavigation && chrome.webNavigation.onBeforeNavigate) {
   chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-    // Only check tabs (frameId === 0 is the main window)
     if (details.frameId === 0 && details.tabId > 0 && isSuspiciousUrl(details.url)) {
       chrome.tabs.remove(details.tabId).catch(() => {});
       sessionStats.redirectsBlocked++;
@@ -153,7 +185,7 @@ if (typeof chrome !== 'undefined' && chrome.webNavigation && chrome.webNavigatio
   });
 }
 
-// Fallback background check on tab creation & update
+// Tab Creation & Update Guard
 if (typeof chrome !== 'undefined' && chrome.tabs) {
   if (chrome.tabs.onCreated) {
     chrome.tabs.onCreated.addListener((tab) => {
@@ -176,4 +208,39 @@ if (typeof chrome !== 'undefined' && chrome.tabs) {
       }
     });
   }
+}
+
+// -------------------------------------------------------------
+// CHROME RAM OPTIMIZER & DISCARD IDLE TABS (Memory Saver)
+// -------------------------------------------------------------
+async function discardIdleTabs(): Promise<number> {
+  if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.tabs.query) {
+    return 0;
+  }
+
+  let count = 0;
+  try {
+    const tabs = await chrome.tabs.query({ active: false, audible: false });
+    for (const tab of tabs) {
+      if (tab.id && !tab.discarded && tab.url && !tab.url.startsWith('chrome://')) {
+        try {
+          await chrome.tabs.discard(tab.id);
+          count++;
+        } catch {
+          // Tab might be playing audio or pinned
+        }
+      }
+    }
+  } catch {}
+  return count;
+}
+
+// Periodic Alarm: Automatically discard idle tabs every 10 minutes to prevent Chrome from eating RAM & Drive C
+if (typeof chrome !== 'undefined' && chrome.alarms) {
+  chrome.alarms.create('shiori_ram_cleaner', { periodInMinutes: 10 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'shiori_ram_cleaner') {
+      discardIdleTabs();
+    }
+  });
 }

@@ -149,3 +149,23 @@
   - `pnpm typecheck`: 0 errors trên toàn bộ 8 workspace packages.
   - Build pipeline: build thành công `dist/` và `popup/popup.js`.
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-13 — Chrome RAM Optimization, Incognito Shield & YouTube Skip Click Finalization
+
+- **Mục tiêu:**
+  1. Tự động click dứt điểm nút "Bỏ qua ▶|" trên YouTube (kể cả khi video chuyển sang màn hình xám quảng cáo).
+  2. Bổ sung tính năng Tối ưu RAM cho Chrome và giảm dung lượng cache phình to trên ổ C: tự động discard các tab nhàn rỗi và hỗ trợ nút bấm "⚡ Tối ưu RAM" trên Popup.
+  3. Mở rộng chế độ hoạt động sang cả **Tab ẩn danh (Incognito Mode)** bằng thuộc tính `"incognito": "spanning"`.
+  4. Mở rộng tập luật cấm triệt để các trang web người lớn, 18+, sex, hentai, cá cược trên toàn bộ các tab thường và ẩn danh.
+- **Tiêu chí hoàn thành:**
+  - YouTube: mô phỏng chuỗi sự kiện chuột có tính toán tọa độ tâm nút (`clientX`, `clientY`), loại bỏ hoàn toàn việc bị kẹt ở màn hình xám. (ĐÃ HOÀN THÀNH)
+  - Tối ưu hóa bộ nhớ: API `chrome.tabs.discard()` và `chrome.browsingData.removeCache()` dọn dẹp các tab nền không dùng sau mỗi 10 phút hoặc bấm nút tức thì. (ĐÃ HOÀN THÀNH)
+  - Hoạt động xuyên suốt trên cả tab thường lẫn tab ẩn danh. (ĐÃ HOÀN THÀNH)
+- **Kiểm thử và kết quả:**
+  - `pnpm test`: 28/28 tests passed.
+  - `pnpm typecheck`: 0 errors.
+  - Build pipeline: build thành công `dist/` và `popup/`.
+- **Trạng thái:** PASS

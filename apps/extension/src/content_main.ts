@@ -1,6 +1,5 @@
 // Main world script: Direct YouTube Ad Auto-Skip & 0ms Click Interceptor
 (function() {
-  // Check if extension is enabled
   let isExtensionEnabled = true;
   try {
     const stored = localStorage.getItem('shiori_enabled');
@@ -13,14 +12,28 @@
     }
   });
 
-  // 1. YouTube High-Speed Auto-Skip Engine running in MAIN world
+  // 1. Synthetic mouse event dispatcher targeting element center
   function dispatchSyntheticClick(el: HTMLElement) {
-    const opts = { bubbles: true, cancelable: true, composed: true, view: window };
+    const rect = el.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX,
+      clientY,
+    };
+
     el.dispatchEvent(new PointerEvent('pointerdown', opts));
     el.dispatchEvent(new MouseEvent('mousedown', opts));
     el.dispatchEvent(new PointerEvent('pointerup', opts));
     el.dispatchEvent(new MouseEvent('mouseup', opts));
     el.dispatchEvent(new MouseEvent('click', opts));
+    try {
+      el.click();
+    } catch {}
   }
 
   let handlingAd = false;
@@ -35,9 +48,7 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // Comprehensive YouTube Ad Detection:
-    // 1. Player class contains ad-showing / ad-interrupting
-    // 2. Or ad badges / overlays are present on screen (like "Được tài trợ", .ytp-ad-player-overlay, etc.)
+    // Detect YouTube Ad State (class on player OR ad badges OR overlay text/container)
     const isAdPlaying =
       player.classList?.contains('ad-showing') ||
       player.classList?.contains('ad-interrupting') ||
@@ -50,28 +61,27 @@
         originalMuted = video.muted;
       }
 
-      // 1. Mute ad immediately
+      // 1. Mute ad instantly
       video.muted = true;
 
       // 2. Fast-forward ad at 16x speed
       video.playbackRate = 16.0;
 
-      // 3. Jump to end of ad
+      // 3. Jump to end of ad clip immediately
       if (video.duration && isFinite(video.duration)) {
-        // Only jump if duration is within standard ad bounds (e.g. <= 120s) or current time is not yet at duration
         if (video.duration <= 120 && video.currentTime < video.duration) {
           video.currentTime = video.duration;
         }
       }
 
-      // 4. Force trigger YouTube player's internal skip API if available
+      // 4. Force trigger internal player skip API
       try {
         if (typeof player.skipAd === 'function') {
           player.skipAd();
         }
       } catch {}
 
-      // 5. Dispatch synthetic click on all skip ad button variants
+      // 5. Aggressive click on ALL known YouTube skip ad selectors (NO offsetParent check)
       const skipSelectors = [
         '.ytp-ad-skip-button',
         '.ytp-ad-skip-button-modern',
@@ -80,7 +90,8 @@
         '.ytp-ad-skip-button-slot button',
         'button[id*="skip"]',
         '.videoAdUiSkipButton',
-        '[class*="skip-button"]'
+        '[class*="skip-button"]',
+        '.ytp-ad-skip-button-container button'
       ];
 
       for (const sel of skipSelectors) {
@@ -89,6 +100,15 @@
           dispatchSyntheticClick(btn);
           break;
         }
+      }
+
+      // 6. If ad clip has ended or currentTime === duration, force resume main video
+      if (video.currentTime >= (video.duration - 0.2)) {
+        try {
+          if (typeof player.playVideo === 'function') {
+            player.playVideo();
+          }
+        } catch {}
       }
     } else {
       // Restore normal playback for the main video
@@ -100,10 +120,9 @@
     }
   }
 
-  // High-frequency polling loop: checks every 50ms for instantaneous ad suppression
+  // High-frequency polling loop: checks every 50ms
   setInterval(handleYouTubeAdState, 50);
 
-  // Hook into video element playback events
   document.addEventListener('play', (e) => {
     if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
       handleYouTubeAdState();
@@ -183,7 +202,11 @@
       lower.includes('popads') ||
       lower.includes('clickadu') ||
       lower.includes('sex') ||
-      lower.includes('xxx')
+      lower.includes('xxx') ||
+      lower.includes('porn') ||
+      lower.includes('hentai') ||
+      lower.includes('jav') ||
+      lower.includes('vlxx')
     );
   }
 

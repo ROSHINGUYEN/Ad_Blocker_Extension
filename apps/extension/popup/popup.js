@@ -82,5 +82,21 @@
         }
       });
     }
+    const ramBtn = document.getElementById("btn-ram");
+    if (ramBtn) {
+      ramBtn.addEventListener("click", () => {
+        ramBtn.textContent = "\u23F3 \u0110ang d\u1ECDn...";
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+          chrome.runtime.sendMessage({ type: "CLEAN_MEMORY_NOW" }, (res) => {
+            chrome.runtime.sendMessage({ type: "CLEAR_CACHE_NOW" }, () => {
+              ramBtn.textContent = `\u26A1 \u0110\xE3 d\u1ECDn ${res?.count || 0} tab!`;
+              setTimeout(() => {
+                ramBtn.textContent = "\u26A1 T\u1ED1i \u01B0u RAM";
+              }, 2e3);
+            });
+          });
+        }
+      });
+    }
   });
 })();
