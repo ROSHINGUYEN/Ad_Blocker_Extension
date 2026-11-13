@@ -41,6 +41,16 @@
         "dist/content_isolated.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://*.youtube.com/*"
+      ],
+      "js": [
+        "dist/content_youtube.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
   "action": {

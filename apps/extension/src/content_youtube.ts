@@ -90,7 +90,11 @@
   let savedMuted = false;
   let savedRate = 1;
 
-  const isAdShowing = () => !!player && AD_CLASSES.some((c) => player!.classList.contains(c));
+  const isAdShowing = () => {
+    if (player && AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
+    if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay, ytd-ad-slot-renderer')) return true;
+    return false;
+  };
 
   function tick(): void {
     if (!player?.isConnected) return;
@@ -102,7 +106,7 @@
         adActive = true;
         savedMuted = video.muted;
         savedRate = video.playbackRate || 1;
-        pollTimer ??= setInterval(tick, 250);
+        pollTimer ??= setInterval(tick, 100);
       }
       video.muted = true;
 

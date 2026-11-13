@@ -229,3 +229,19 @@
   - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
   - Build extension thành công ra `apps/extension/dist/`. (ĐÃ HOÀN THÀNH)
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-14 — Declarative Registration of content_youtube.js in manifest.json & Enhanced Detector
+
+- **Mục tiêu:**
+  1. Khắc phục nguyên nhân gốc rễ khiến script YouTube không chạy: trước đó `content_youtube.js` chỉ được đăng ký động qua `chrome.scripting.registerContentScripts` trong background. Nếu extension vừa reload hoặc người dùng mở tab YouTube trước khi background khởi chạy xong, script YouTube hoàn toàn không được inject vào trang.
+  2. Khai báo tĩnh trực tiếp `dist/content_youtube.js` vào mảng `content_scripts` trong `manifest.json` với `"world": "MAIN"` và `"matches": ["*://*.youtube.com/*"]`.
+  3. Mở rộng cơ chế `isAdShowing()` để bắt kịp cả `.ytp-ad-player-overlay` và các thẻ quảng cáo ngoài luồng, tăng tần suất lặp lên 100ms trong lúc có quảng cáo.
+- **Tiêu chí hoàn thành:**
+  - Script YouTube đảm bảo 100% được nạp ngay từ `document_start` trên mọi tab YouTube. (ĐÃ HOÀN THÀNH)
+  - `pnpm -r run typecheck`: 0 lỗi. (ĐÃ HOÀN THÀNH)
+  - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
+  - `apps/extension` build thành công. (ĐÃ HOÀN THÀNH)
+- **Trạng thái:** PASS
