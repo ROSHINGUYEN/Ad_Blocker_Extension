@@ -72,7 +72,7 @@ export function initializeContentProtection(): void {
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
     chrome.runtime.sendMessage(
       { type: 'GET_COSMETIC_CSS', payload: { hostname: currentHostname } },
-      (response) => {
+      (response: { css?: string } | undefined) => {
         if (response?.css) {
           const style = document.createElement('style');
           style.id = 'shiori-cosmetic-styles';
