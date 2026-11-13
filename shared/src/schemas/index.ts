@@ -62,6 +62,7 @@ export const ShioriRulePackageSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
   checksum: z.string().regex(/^[a-f0-9]{64}$/i, 'Checksum phải là SHA-256 hợp lệ'),
+  signature: z.string().regex(/^[a-f0-9]{128}$/i, 'Signature phải là Ed25519 hex (64 bytes / 128 chars)').optional(),
   createdAt: z.number().positive(),
   rulesCount: z.number().nonnegative(),
   rules: z.array(BaseRuleSchema),

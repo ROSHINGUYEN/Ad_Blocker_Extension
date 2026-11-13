@@ -28,6 +28,7 @@ export interface ShioriRulePackage {
   name: string;
   version: string;
   checksum: string; // SHA-256
+  signature?: string; // Ed25519 hex signature (optional for backwards compatibility)
   createdAt: number;
   rulesCount: number;
   rules: BaseRule[];

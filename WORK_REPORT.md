@@ -186,3 +186,26 @@
   - `pnpm typecheck`: 0 errors trên toàn bộ 9 workspace packages.
   - Biên dịch ứng dụng di động bằng Vite: thành công 100%, bundle sẵn sàng trong `apps/mobile/dist/`.
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-14 — Roadmap Step 3 (a & b): Canonical JSON & Ed25519 Origin Authenticity
+
+- **Mục tiêu:**
+  1. Thay thế `JSON.stringify` bằng Canonical JSON (RFC 8785) sắp xếp key đệ quy, đảm bảo hai object quy tắc cùng nội dung nhưng khác thứ tự key luôn sinh ra cùng mã băm SHA-256.
+  2. Triển khai cơ chế xác thực nguồn gốc (Origin Authenticity) bằng chữ ký bất đối xứng Ed25519 (`node:crypto`):
+     - Hàm ký `signPackage` ở server.
+     - Hàm xác minh `verifySignature` và tích hợp vào `verifyPackage`.
+     - Chống giả mạo gói dữ liệu luật (tamper detection) kể cả khi kẻ tấn công can thiệp sửa checksum.
+- **Tiêu chí hoàn thành:**
+  - Viết unit test chứng minh hai danh sách rule khác thứ tự thuộc tính object cho ra cùng checksum SHA-256. (ĐÃ HOÀN THÀNH)
+  - Viết unit test xác thực chữ ký Ed25519 hợp lệ và từ chối khi payload bị sửa 1 byte hoặc ký sai khoá bí mật. (ĐÃ HOÀN THÀNH)
+  - `pnpm -r run typecheck`: 0 lỗi trên 8 packages. (ĐÃ HOÀN THÀNH)
+  - `pnpm test`: 43/43 tests pass (11/11 test files). (ĐÃ HOÀN THÀNH)
+- **File thay đổi:**
+  - `shared/src/types/rules.ts`: Thêm trường `signature?: string` cho `ShioriRulePackage`.
+  - `shared/src/schemas/index.ts`: Cập nhật schema Zod hỗ trợ signature Ed25519 hex (128 ký tự).
+  - `backend/src/rule-distribution-service.ts`: Triển khai `canonicalStringify`, `signPackage`, `verifySignature`.
+  - `backend/test/rule-distribution.test.ts`: Thêm 2 test suite hồi quy cho Canonical JSON và Ed25519.
+- **Trạng thái:** PASS
