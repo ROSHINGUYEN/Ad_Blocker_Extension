@@ -155,92 +155,17 @@ export function initializeContentProtection(): void {
     return count;
   }
 
-  // Immediate execution for YouTube (do not wait for DOM ready!)
-  if (isYouTube) {
-    const sweepYouTubeAds = () => {
-      if (!isProtectionEnabled) return;
-      const adIndicator = document.querySelector(
-        '.ad-showing, .ad-interrupting, .ytp-ad-player-overlay, .ytp-ad-text, [class*="ytp-ad-module"], ytd-ad-slot-renderer, [class*="skip-button"]'
-      );
-      const video = document.querySelector('video') as HTMLVideoElement | null;
-      if (adIndicator && video) {
-        // 1. Mute ad immediately
-        video.muted = true;
-        // 2. Fast forward ad straight to end
-        if (video.duration && isFinite(video.duration) && video.duration > 0) {
-          video.playbackRate = 16.0;
-          if (video.currentTime < video.duration - 0.1) {
-            video.currentTime = video.duration;
-          }
-        }
-        // 3. Auto click skip button
-        const skipBtn = document.querySelector<HTMLElement>(
-          '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button, .videoAdUiSkipButton, [class*="skip-button"], div.ytp-ad-text'
-        );
-        if (skipBtn) {
-          skipBtn.click();
-        }
-      }
-    };
-
-    // Run every 25ms continuously
-    setInterval(sweepYouTubeAds, 25);
-
-    const ytObserver = new MutationObserver(sweepYouTubeAds);
-    const startObserver = () => {
-      const target = document.body || document.documentElement;
-      if (target) {
-        ytObserver.observe(target, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['class', 'src']
-        });
-      }
-    };
-
-    if (document.documentElement) {
-      startObserver();
+  // Initial and live DOM scanning
+  if (typeof document !== 'undefined') {
+    if (document.body) {
+      runScan();
     } else {
-      document.addEventListener('DOMContentLoaded', startObserver);
+      document.addEventListener('DOMContentLoaded', runScan);
     }
   }
 
   function runScan(): void {
     if (isYouTube) {
-      // In-stream YouTube ad active terminator loop in isolated world
-      function sweepYouTubeAds() {
-        if (!isProtectionEnabled) return;
-        const adPlayer = document.querySelector('.ad-showing, .ad-interrupting, [class*="ytp-ad-module"]');
-        const video = document.querySelector('video') as HTMLVideoElement | null;
-        if (adPlayer && video) {
-          // 1. Mute ad instantly
-          video.muted = true;
-          // 2. Fast forward ad straight to end
-          if (video.duration && isFinite(video.duration) && video.duration > 0) {
-            video.playbackRate = 16.0;
-            video.currentTime = video.duration;
-          }
-          // 3. Auto click skip button
-          const skipBtn = document.querySelector<HTMLElement>(
-            '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button, .videoAdUiSkipButton, [class*="skip-button"]'
-          );
-          if (skipBtn) {
-            skipBtn.click();
-          }
-        }
-      }
-
-      setInterval(sweepYouTubeAds, 50);
-
-      const observer = new MutationObserver(sweepYouTubeAds);
-      observer.observe(document.body || document.documentElement, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class']
-      });
-
       const container = document.getElementById('movie_player') || document.body;
       const video = document.querySelector('video');
       const ytDetections = youTubeEngine.evaluateState(container, video);
