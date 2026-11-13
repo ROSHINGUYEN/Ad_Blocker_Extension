@@ -33,6 +33,9 @@
     } catch {}
   }
 
+  let wasAdPlaying = false;
+  let userPreferredMuted = false;
+
   function handleYouTubeAdState() {
     if (!isExtensionEnabled) return;
     if (!window.location.hostname.includes('youtube.com')) return;
@@ -41,32 +44,29 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // Detect YouTube Ad State (class on player OR ad badges OR overlay text/container)
-    const isAdPlaying =
+    // Strict detection: YouTube explicitly marks the player with .ad-showing or .ad-interrupting
+    const isAdPlaying = Boolean(
       player.classList?.contains('ad-showing') ||
-      player.classList?.contains('ad-interrupting') ||
-      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module, ytd-ad-slot-renderer, .ytp-ad-badge, [class*="ytp-ad-"], [class*="skip-button"]'));
+      player.classList?.contains('ad-interrupting')
+    );
 
     if (isAdPlaying) {
-      // 1. Mute ad immediately
-      video.muted = true;
-
-      // 2. Safe ad fast-forward: ONLY if ad duration is short (e.g. <= 90s)
-      if (video.duration && isFinite(video.duration) && video.duration <= 90) {
-        video.playbackRate = 16.0;
-        if (video.currentTime < video.duration - 0.2) {
-          video.currentTime = video.duration - 0.1;
-        }
+      if (!wasAdPlaying) {
+        wasAdPlaying = true;
+        userPreferredMuted = video.muted;
       }
 
-      // 3. Trigger YouTube internal skip API
+      // 1. Mute audio during ad so user hears no ad noise
+      video.muted = true;
+
+      // 2. Trigger YouTube player skipAd API if exposed
       try {
         if (typeof player.skipAd === 'function') {
           player.skipAd();
         }
       } catch {}
 
-      // 4. Click all skip button variants
+      // 3. Click YouTube skip button variants with synthetic events
       const skipSelectors = [
         '.ytp-ad-skip-button-modern',
         '.ytp-skip-ad-button',
@@ -75,8 +75,7 @@
         'button.ytp-ad-skip-button-text',
         '.ytp-ad-skip-button-container button',
         '.videoAdUiSkipButton',
-        '[class*="skip-button"]',
-        'div.ytp-ad-text'
+        '[class*="skip-button"]'
       ];
 
       for (const sel of skipSelectors) {
@@ -86,24 +85,31 @@
         });
       }
 
-      // Click any button containing Skip / Bỏ qua
-      const allButtons = document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text, button[id*="skip"]');
-      allButtons.forEach((btn) => {
+      // Also detect any button with text "skip" or "bỏ qua" inside player ads
+      const playerAdBtns = player.querySelectorAll<HTMLElement>('button');
+      playerAdBtns.forEach((btn: HTMLElement) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
-        if (txt.includes('bỏ qua') || txt.includes('skip')) {
+        if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
           dispatchClick(btn);
         }
       });
     } else {
-      // Restore normal playback for the main video
-      if (video.playbackRate > 2.0) {
+      // Ad has ended or user is watching real content
+      if (wasAdPlaying) {
+        wasAdPlaying = false;
+        // Restore user sound preferences
+        video.muted = userPreferredMuted;
+      }
+
+      // Ensure playbackRate is never left altered
+      if (video.playbackRate !== 1.0 && video.playbackRate > 2.0) {
         video.playbackRate = 1.0;
       }
     }
   }
 
-  // Polling loop every 50ms
-  setInterval(handleYouTubeAdState, 50);
+  // Polling loop every 200ms (lightweight, zero lag)
+  setInterval(handleYouTubeAdState, 200);
 
   document.addEventListener('play', (e) => {
     if ((e.target as HTMLElement)?.tagName === 'VIDEO') {

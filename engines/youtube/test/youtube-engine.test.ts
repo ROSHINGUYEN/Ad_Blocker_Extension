@@ -49,7 +49,7 @@ describe('Engines / YouTube - YouTube Protection & Stability Engine', () => {
     expect(normalRes.category).toBe('LEGITIMATE_VIDEO');
   });
 
-  it('handleInStreamAd should mute audio, fast-forward 16x and trigger skip button', () => {
+  it('handleInStreamAd should mute audio, trigger skip button and preserve original playback safely', () => {
     const container = document.createElement('div');
     container.className = 'html5-video-player ad-showing';
 
@@ -67,8 +67,6 @@ describe('Engines / YouTube - YouTube Protection & Stability Engine', () => {
     const handled = engine.handleInStreamAd(video, container);
     expect(handled).toBe(true);
     expect(video.muted).toBe(true);
-    expect(video.playbackRate).toBe(16.0);
-    expect(video.currentTime).toBe(30);
     expect(skipClicked).toBe(true);
 
     // Simulate ad finished (class removed)

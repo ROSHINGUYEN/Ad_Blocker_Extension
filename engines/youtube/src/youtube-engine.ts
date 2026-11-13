@@ -22,10 +22,10 @@ export class ShioriYouTubeEngine {
       return false;
     }
 
+    // STRICT AD DETECTION: Only when container actually has ad-showing or ad-interrupting
     const isAdPlaying =
       container.classList.contains('ad-showing') ||
-      container.classList.contains('ad-interrupting') ||
-      Boolean(container.querySelector('.ytp-ad-player-overlay, .ytp-ad-text'));
+      container.classList.contains('ad-interrupting');
 
     if (isAdPlaying) {
       if (!this.isCurrentlyHandlingAd) {
@@ -34,18 +34,13 @@ export class ShioriYouTubeEngine {
         this.originalPlaybackRate = video.playbackRate || 1.0;
       }
 
-      // 1. Mute audio instantly so the user hears zero ad noise
+      // 1. Mute audio during ad
       video.muted = true;
 
-      // 2. Fast forward ad at maximum possible speed (16x) and seek to end
-      video.playbackRate = 16.0;
-      if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
-        video.currentTime = video.duration;
-      }
-
+      // 2. DO NOT tamper with video.currentTime or playbackRate to prevent fast-forwarding real video!
       // 3. Auto click skip button if available
       const skipButton = container.querySelector<HTMLElement>(
-        '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button'
+        '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button, .ytp-ad-skip-button-slot button'
       );
       if (skipButton) {
         skipButton.click();
@@ -57,7 +52,7 @@ export class ShioriYouTubeEngine {
       if (this.isCurrentlyHandlingAd) {
         this.isCurrentlyHandlingAd = false;
         video.muted = this.originalMutedState;
-        video.playbackRate = this.originalPlaybackRate;
+        video.playbackRate = this.originalPlaybackRate || 1.0;
       }
       return false;
     }
