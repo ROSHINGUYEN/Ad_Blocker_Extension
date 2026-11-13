@@ -93,27 +93,52 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
   chrome.runtime.onMessage.addListener(handleExtensionMessage);
 }
 
-// Chrome Tabs Pop-under Guard: Prevent auto-spawned gambling tabs
-// Closes tabs only when they are clearly untrusted popunders (NOT legitimate user navigation!)
-if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onCreated) {
-  chrome.tabs.onCreated.addListener((tab) => {
-    // Only inspect tabs that were opened by another tab without user gesture
-    if (tab.openerTabId) {
-      const targetUrl = tab.pendingUrl || tab.url || '';
-      if (targetUrl) {
-        const decision = redirectGuard.evaluateNavigation(targetUrl, '', {
-          isTrustedUserGesture: false,
-          timeSinceLastClickMs: 99999,
-          isTriggeredByScriptTimer: true,
-        });
+// Background Tab Creation & Update Guard:
+// If a tab is spawned pointing to gambling tracking patterns or triggered by third-party links, close it immediately!
+function checkAndCloseSuspiciousTab(tabId: number, url: string, openerTabId?: number) {
+  if (!url || url === 'about:blank') return;
 
-        if (!decision.allow && tab.id) {
-          chrome.tabs.remove(tab.id);
-          sessionStats.redirectsBlocked++;
-          sessionStats.updatedAt = Date.now();
-          console.warn(`[Shiori Popunder Guard] Blocked & closed popup tab: ${targetUrl}`);
-        }
+  const lower = url.toLowerCase();
+  const isGamblingOrAdTracking = (
+    lower.includes('utm_medium=topbanner') ||
+    lower.includes('utm_medium=pc-catfish') ||
+    lower.includes('utm_campaign=cpd') ||
+    lower.includes('gemwin') ||
+    lower.includes('haywin') ||
+    lower.includes('uk88') ||
+    lower.includes('hitclub') ||
+    lower.includes('win79') ||
+    lower.includes('sunwin') ||
+    lower.includes('cacuoc') ||
+    lower.includes('gamebai') ||
+    lower.includes('nhacai') ||
+    lower.includes('popads') ||
+    lower.includes('clickadu')
+  );
+
+  if (isGamblingOrAdTracking && tabId) {
+    chrome.tabs.remove(tabId);
+    sessionStats.redirectsBlocked++;
+    sessionStats.updatedAt = Date.now();
+  }
+}
+
+if (typeof chrome !== 'undefined' && chrome.tabs) {
+  if (chrome.tabs.onCreated) {
+    chrome.tabs.onCreated.addListener((tab) => {
+      const targetUrl = tab.pendingUrl || tab.url || '';
+      if (tab.id && targetUrl) {
+        checkAndCloseSuspiciousTab(tab.id, targetUrl, tab.openerTabId);
       }
-    }
-  });
+    });
+  }
+
+  if (chrome.tabs.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      const targetUrl = changeInfo.url || tab.pendingUrl || tab.url || '';
+      if (tabId && targetUrl) {
+        checkAndCloseSuspiciousTab(tabId, targetUrl, tab.openerTabId);
+      }
+    });
+  }
 }

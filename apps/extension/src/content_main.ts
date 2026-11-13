@@ -67,31 +67,46 @@
     };
   } catch {}
 
-  // 3. Intercept click hijacking
-  window.addEventListener('click', (event: MouseEvent) => {
+  // 3. Intercept direct and delegated clicks on all ad links (including target="_blank")
+  function handleLinkClick(event: MouseEvent) {
     let el = event.target as HTMLElement | null;
     while (el && el !== document.body && el !== document.documentElement) {
       if (el.tagName === 'A') {
-        const href = (el as HTMLAnchorElement).href || '';
+        const anchor = el as HTMLAnchorElement;
+        const href = anchor.href || anchor.getAttribute('href') || '';
         const lower = href.toLowerCase();
-        if (
-          lower.includes('catfish') ||
+
+        // Any link containing ad/campaign tracking or gambling signatures
+        const isAd = (
+          lower.includes('utm_medium=topbanner') ||
           lower.includes('utm_medium=pc-catfish') ||
+          lower.includes('utm_campaign=cpd') ||
+          lower.includes('gemwin') ||
           lower.includes('haywin') ||
           lower.includes('uk88') ||
           lower.includes('hitclub') ||
           lower.includes('win79') ||
           lower.includes('sunwin') ||
-          lower.includes('cacuoc')
-        ) {
+          lower.includes('cacuoc') ||
+          lower.includes('gamebai') ||
+          lower.includes('nhacai')
+        );
+
+        if (isAd) {
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();
+          // Remove or neutralize the anchor immediately
+          anchor.removeAttribute('href');
+          anchor.style.pointerEvents = 'none';
           window.postMessage({ type: 'SHIORI_CLICK_BLOCKED', url: href }, '*');
           return;
         }
       }
       el = el.parentElement;
     }
-  }, true);
+  }
+
+  window.addEventListener('click', handleLinkClick, true);
+  window.addEventListener('auxclick', handleLinkClick, true); // middle click support
 })();
