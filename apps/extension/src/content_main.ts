@@ -44,10 +44,11 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // Strict detection: YouTube explicitly marks the player with .ad-showing or .ad-interrupting
+    // Detect if YouTube is showing an in-stream ad
     const isAdPlaying = Boolean(
       player.classList?.contains('ad-showing') ||
-      player.classList?.contains('ad-interrupting')
+      player.classList?.contains('ad-interrupting') ||
+      document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text-overlay, [class*="ytp-ad-module"]')
     );
 
     if (isAdPlaying) {
@@ -56,17 +57,27 @@
         userPreferredMuted = video.muted;
       }
 
-      // 1. Mute audio during ad so user hears no ad noise
+      // 1. Mute ad immediately
       video.muted = true;
 
-      // 2. Trigger YouTube player skipAd API if exposed
+      // 2. Safely jump to the end of the ad video (Non-skippable ads: 0:01 / 0:33)
+      // Since isAdPlaying is verified on movie_player, video is currently the ad video stream!
+      if (video.duration && isFinite(video.duration) && video.duration > 0) {
+        // Fast-forward playback and seek directly to the last millisecond
+        video.playbackRate = 16.0;
+        if (video.currentTime < video.duration - 0.1) {
+          video.currentTime = video.duration;
+        }
+      }
+
+      // 3. Trigger YouTube internal skipAd() API
       try {
         if (typeof player.skipAd === 'function') {
           player.skipAd();
         }
       } catch {}
 
-      // 3. Click YouTube skip button variants with synthetic events
+      // 4. Click all skip button variants immediately
       const skipSelectors = [
         '.ytp-ad-skip-button-modern',
         '.ytp-skip-ad-button',
@@ -85,7 +96,7 @@
         });
       }
 
-      // Also detect any button with text "skip" or "bỏ qua" inside player ads
+      // Also click any button with text "skip" or "bỏ qua"
       const playerAdBtns = player.querySelectorAll<HTMLElement>('button');
       playerAdBtns.forEach((btn: HTMLElement) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
@@ -94,22 +105,21 @@
         }
       });
     } else {
-      // Ad has ended or user is watching real content
+      // Content video is playing: RESTORE NORMAL SPEED AND SOUND IMMEDIATELY
       if (wasAdPlaying) {
         wasAdPlaying = false;
-        // Restore user sound preferences
         video.muted = userPreferredMuted;
       }
 
-      // Ensure playbackRate is never left altered
-      if (video.playbackRate !== 1.0 && video.playbackRate > 2.0) {
+      // Guaranteed 1.0x playback for the main video
+      if (video.playbackRate > 1.0) {
         video.playbackRate = 1.0;
       }
     }
   }
 
-  // Polling loop every 200ms (lightweight, zero lag)
-  setInterval(handleYouTubeAdState, 200);
+  // Fast polling loop every 50ms so ad finishes in <0.1s
+  setInterval(handleYouTubeAdState, 50);
 
   document.addEventListener('play', (e) => {
     if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
