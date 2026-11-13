@@ -16,6 +16,9 @@
     "@shiori/youtube-engine": "workspace:*"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "typescript": "^5.7.3",
     "vite": "^6.2.0"
   }
