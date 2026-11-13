@@ -41,16 +41,27 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // CHECK CHÍNH XÁC 100%: Chỉ can thiệp khi YouTube có class ad-showing hoặc ad-interrupting
-    const isRealAdPlaying =
+    // CHECK CHÍNH XÁC: Phát hiện quảng cáo in-stream (kể cả quảng cáo không thể bỏ qua Aquafina 0:05)
+    const isRealAdPlaying = Boolean(
       player.classList?.contains('ad-showing') ||
-      player.classList?.contains('ad-interrupting');
+      player.classList?.contains('ad-interrupting') ||
+      document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, [class*="ytp-ad-module"], ytd-ad-slot-renderer')
+    );
 
     if (isRealAdPlaying) {
       // 1. Tắt tiếng ad để không làm phiền người dùng
       video.muted = true;
 
-      // 2. Click nút Skip Ad ngay lập tức (KHÔNG TUA VIDEO BẰNG PLAYBACKRATE HOẶC CURRENTTIME NỮA ĐỂ TRÁNH LỖI)
+      // 2. Với quảng cáo ngắn/không thể bỏ qua (như Aquafina 5s, Dola 15s, Topview 15s):
+      // Đẩy currentTime về duration để kết thúc ngay lập tức trong 0.05s
+      if (video.duration && isFinite(video.duration) && video.duration > 0) {
+        video.playbackRate = 16.0;
+        if (video.currentTime < video.duration - 0.1) {
+          video.currentTime = video.duration;
+        }
+      }
+
+      // 3. Click nút Skip Ad ngay lập tức nếu có
       try {
         if (typeof player.skipAd === 'function') {
           player.skipAd();
@@ -84,15 +95,25 @@
         }
       });
     } else {
-      // TUYỆT ĐỐI KHÔNG CAN THIỆP KHI VIDEO CHÍNH ĐANG PHÁT: Giữ nguyên tốc độ chuẩn của người dùng
-      if (video.playbackRate > 2.0) {
+      // Khi video chính phát: Khôi phục tốc độ 1.0x chuẩn tuyệt đối
+      if (video.playbackRate > 1.0) {
         video.playbackRate = 1.0;
       }
     }
   }
 
-  // Quét định kỳ 100ms
-  setInterval(handleYouTubeAdState, 100);
+  // Quét định kỳ 50ms và dùng MutationObserver để bắt ad ngay tích tắc
+  setInterval(handleYouTubeAdState, 50);
+
+  const adObserver = new MutationObserver(handleYouTubeAdState);
+  if (document.documentElement) {
+    adObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'src']
+    });
+  }
 
   window.addEventListener('yt-navigate-finish', () => {
     handleYouTubeAdState();
