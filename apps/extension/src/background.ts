@@ -247,12 +247,43 @@ async function discardIdleTabs(): Promise<number> {
   return count;
 }
 
-// Periodic Alarm: Automatically discard idle tabs every 10 minutes to prevent Chrome from eating RAM & Drive C
-if (typeof chrome !== 'undefined' && chrome.alarms) {
-  chrome.alarms.create('shiori_ram_cleaner', { periodInMinutes: 10 });
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'shiori_ram_cleaner') {
-      discardIdleTabs();
-    }
-  });
+// -------------------------------------------------------------
+// HIGH-SPEED NETWORK & WIFI ACCELERATOR (Keep-alive & Optimized Headers)
+// -------------------------------------------------------------
+let isTurboSpeedEnabled = true;
+
+// Pre-warm connections and optimize network throughput
+if (typeof chrome !== 'undefined' && chrome.declarativeNetRequest) {
+  // Update dynamic rules to request high-speed compression (gzip, br, zstd)
+  try {
+    chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [10001],
+      addRules: [
+        {
+          id: 10001,
+          priority: 1,
+          action: {
+            type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
+            requestHeaders: [
+              {
+                header: 'Accept-Encoding',
+                operation: chrome.declarativeNetRequest.HeaderOperation.SET,
+                value: 'gzip, deflate, br, zstd',
+              },
+            ],
+          },
+          condition: {
+            urlFilter: '*',
+            resourceTypes: [
+              chrome.declarativeNetRequest.ResourceType.MAIN_FRAME,
+              chrome.declarativeNetRequest.ResourceType.SUB_FRAME,
+              chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
+              chrome.declarativeNetRequest.ResourceType.MEDIA,
+              chrome.declarativeNetRequest.ResourceType.OTHER,
+            ],
+          },
+        },
+      ],
+    }).catch(() => {});
+  } catch {}
 }

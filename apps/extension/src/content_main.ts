@@ -22,6 +22,13 @@
       if (obj.playerAds) delete obj.playerAds;
       if (obj.adSlots) delete obj.adSlots;
       if (obj.adBreakHeartbeatParams) delete obj.adBreakHeartbeatParams;
+      if (obj.adPlaybackContext) delete obj.adPlaybackContext;
+      if (obj.playerConfig?.adConfig) delete obj.playerConfig.adConfig;
+      if (obj.playbackTracking) {
+        delete obj.playbackTracking.videostatsPlaybackUrl;
+        delete obj.playbackTracking.videostatsDelayplayUrl;
+        delete obj.playbackTracking.videostatsWatchtimeUrl;
+      }
     } catch {}
     return obj;
   }
@@ -41,6 +48,21 @@
     });
     if (internalPlayerResponse) {
       cleanYouTubePlayerObject(internalPlayerResponse);
+    }
+  } catch {}
+
+  // Override ytcfg to disable ad configurations
+  try {
+    const origSet = (window as any).ytcfg?.set;
+    if (typeof origSet === 'function') {
+      (window as any).ytcfg.set = function(...args: any[]) {
+        if (args[0] && typeof args[0] === 'object') {
+          if (args[0].EXPERIMENT_FLAGS) {
+            args[0].EXPERIMENT_FLAGS.disable_ad_frequency_cap = true;
+          }
+        }
+        return origSet.apply(this, args);
+      };
     }
   } catch {}
 
