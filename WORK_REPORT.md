@@ -209,3 +209,23 @@
   - `backend/src/rule-distribution-service.ts`: Triển khai `canonicalStringify`, `signPackage`, `verifySignature`.
   - `backend/test/rule-distribution.test.ts`: Thêm 2 test suite hồi quy cho Canonical JSON và Ed25519.
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-14 — Fix DNR regexFilter 2KB limit & Enhance YouTube Click/Skip Engine
+
+- **Mục tiêu:**
+  1. Khắc phục cảnh báo Chrome DevTools: `Rule with id 6 was skipped as the "regexFilter" value exceeded the 2KB memory limit when compiled`. Rút gọn và tối ưu hoá regex cho rule cờ bạc (id 6) và web 18+ (id 7) trong `rules/rules.json`.
+  2. Khắc phục lỗi nút Skip Ad YouTube không ăn click:
+     - Đổi từ `skip.click()` đơn thuần sang `dispatchSyntheticClick` (chuỗi sự kiện: pointerdown -> mousedown -> pointerup -> mouseup -> click với toạ độ thực tế).
+     - Bổ sung gọi trực tiếp API `player.skipAd()` nếu player YouTube hỗ trợ.
+     - Quét thêm các nút chứa text "Bỏ qua" / "Skip".
+     - Bổ sung bộ selector mở rộng cho nút Skip Ad hiện đại của YouTube.
+- **Tiêu chí hoàn thành:**
+  - `rules.json` không còn bị Chrome bỏ qua do vượt giới hạn bộ nhớ 2KB regex. (ĐÃ HOÀN THÀNH)
+  - Sự kiện skip YouTube được bắn đầy đủ các synthetic mouse/pointer events. (ĐÃ HOÀN THÀNH)
+  - `pnpm -r run typecheck`: 0 lỗi. (ĐÃ HOÀN THÀNH)
+  - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
+  - Build extension thành công ra `apps/extension/dist/`. (ĐÃ HOÀN THÀNH)
+- **Trạng thái:** PASS

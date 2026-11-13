@@ -85,7 +85,7 @@
       "type": "block"
     },
     "condition": {
-      "regexFilter": "^https?://([^/:?#]*\\.)?(gemwin|haywin|uk88|hitclub|win79|sunwin|yo88|rikvip|go88|bet88|tic88|zowin|cacuoc|gamebai|nhacai)[0-9-]*\\.[^/:?#]+(:[0-9]+)?([/?#]|$)",
+      "regexFilter": "^https?://([^/:?#]+\\.)?(gemwin|haywin|uk88|hitclub|win79|sunwin|yo88|rikvip|go88|bet88|tic88|zowin|cacuoc|gamebai|nhacai)[0-9-]*\\.[a-z]{2,}(/.*)?$",
       "isUrlFilterCaseSensitive": false,
       "resourceTypes": [
         "main_frame",
@@ -103,7 +103,7 @@
       "type": "block"
     },
     "condition": {
-      "regexFilter": "^https?://([^/:?#]*\\.)?(pornhub|xvideos|xnxx|vlxx|phimsex|hentai)[0-9-]*\\.[^/:?#]+(:[0-9]+)?([/?#]|$)",
+      "regexFilter": "^https?://([^/:?#]+\\.)?(pornhub|xvideos|xnxx|vlxx|phimsex|hentai)[0-9-]*\\.[a-z]{2,}(/.*)?$",
       "isUrlFilterCaseSensitive": false,
       "resourceTypes": [
         "main_frame",

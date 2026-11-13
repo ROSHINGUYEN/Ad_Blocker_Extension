@@ -14,8 +14,28 @@
 (() => {
   const AD_CLASSES = ['ad-showing', 'ad-interrupting'];
   const SKIP_SELECTOR =
-    '.ytp-skip-ad-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button, .ytp-ad-skip-button-container button';
+    '.ytp-skip-ad-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button, .ytp-ad-skip-button-slot button, button.ytp-ad-skip-button-text, .ytp-ad-skip-button-container button, .videoAdUiSkipButton';
   const MAX_AD_SECONDS = 600;
+
+  function dispatchSyntheticClick(el: HTMLElement): void {
+    try {
+      const rect = el.getBoundingClientRect();
+      const opts: MouseEventInit = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      };
+      el.dispatchEvent(new PointerEvent('pointerdown', opts));
+      el.dispatchEvent(new MouseEvent('mousedown', opts));
+      el.dispatchEvent(new PointerEvent('pointerup', opts));
+      el.dispatchEvent(new MouseEvent('mouseup', opts));
+      el.dispatchEvent(new MouseEvent('click', opts));
+      el.click();
+    } catch {}
+  }
 
   /* ---------- 1) Loại dữ liệu quảng cáo khỏi player response ---------- */
   const AD_KEYS = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adPlaybackContext'];
@@ -86,8 +106,25 @@
       }
       video.muted = true;
 
-      const skip = player.querySelector<HTMLElement>(SKIP_SELECTOR);
-      if (skip && skip.offsetParent !== null) skip.click();
+      // 1) Thử gọi API native player
+      try {
+        const p = player as any;
+        if (typeof p.skipAd === 'function') p.skipAd();
+      } catch {}
+
+      // 2) Tự động click mọi selector của nút Skip bằng synthetic events
+      const skipButtons = player.querySelectorAll<HTMLElement>(SKIP_SELECTOR);
+      skipButtons.forEach((btn) => {
+        dispatchSyntheticClick(btn);
+      });
+
+      // 3) Quét thêm button chứa chữ "Bỏ qua" hoặc "Skip"
+      player.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text').forEach((btn) => {
+        const txt = btn.textContent?.trim().toLowerCase() || '';
+        if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
+          dispatchSyntheticClick(btn);
+        }
+      });
 
       const d = video.duration;
       if (Number.isFinite(d) && d > 0 && d <= MAX_AD_SECONDS && video.currentTime < d - 0.25) {
