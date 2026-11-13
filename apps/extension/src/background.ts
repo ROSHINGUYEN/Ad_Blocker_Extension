@@ -28,12 +28,27 @@ ruleEngine.loadFromRawText(`
 ||clickadu.com^
 ||adsterra.com^
 ||propellerads.com^
+||6789x.site^
+||gemwin^
+||haywin^
+||yo88^
+||uk88^
+||hitclub^
+||win79^
+||sunwin^
+||rikvip^
+||go88^
+||bet88^
 ##.ad-banner
 ##.sponsor-card
 ##.popup-banner
 ##.floating-banner
 ##.ad-bottom
 ##.banner-center
+##.banner-top
+##.catfish-banner
+##[class*="catfish"]
+##[id*="catfish"]
 `, 'shiori_core_filter');
 
 /**
@@ -93,9 +108,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
   chrome.runtime.onMessage.addListener(handleExtensionMessage);
 }
 
+// Listen to declarativeNetRequest matched rules to accurately reflect Network Filtered count
+if (typeof chrome !== 'undefined' && chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDebug) {
+  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((_info) => {
+    sessionStats.requestsFiltered++;
+    sessionStats.updatedAt = Date.now();
+  });
+}
+
 // Background Tab Creation & Update Guard:
 // If a tab is spawned pointing to gambling tracking patterns or triggered by third-party links, close it immediately!
-function checkAndCloseSuspiciousTab(tabId: number, url: string, openerTabId?: number) {
+function checkAndCloseSuspiciousTab(tabId: number, url: string, _openerTabId?: number) {
   if (!url || url === 'about:blank') return;
 
   const lower = url.toLowerCase();
@@ -109,6 +132,11 @@ function checkAndCloseSuspiciousTab(tabId: number, url: string, openerTabId?: nu
     lower.includes('hitclub') ||
     lower.includes('win79') ||
     lower.includes('sunwin') ||
+    lower.includes('yo88') ||
+    lower.includes('rikvip') ||
+    lower.includes('go88') ||
+    lower.includes('bet88') ||
+    lower.includes('6789x.site') ||
     lower.includes('cacuoc') ||
     lower.includes('gamebai') ||
     lower.includes('nhacai') ||

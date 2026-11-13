@@ -9,22 +9,32 @@ const localRuleEngine = new ShioriRuleEngine();
 const webAdEngine = new ShioriWebAdEngine(localRuleEngine, { currentHostname });
 const youTubeEngine = new ShioriYouTubeEngine();
 
-// Instant shield stylesheet
+// Powerful instant shield stylesheet targeting ad banners, catfish, floating popups, sticky footers, and gambling
 const INLINE_SHIELD_CSS = `
   [class*="catfish"], [id*="catfish"],
   [class*="popup-banner"], [id*="popup-banner"],
   [class*="floating-ad"], [id*="floating-ad"],
   [class*="bottom-fixed"], [class*="ad-bottom"],
   [class*="ad-sticky"], [id*="ad-sticky"],
+  [class*="banner-top"], [id*="banner-top"],
+  [class*="banner-center"], [id*="banner-center"],
+  [class*="ads-holder"], [id*="ads-holder"],
+  [class*="adv-"], [id*="adv-"],
   .ad-center, .banner-center, #banner-center,
-  a[href*="haywin"], a[href*="catfish"], a[href*="uk88"],
+  a[href*="haywin"], a[href*="gemwin"], a[href*="uk88"],
   a[href*="hitclub"], a[href*="win79"], a[href*="sunwin"],
-  a[href*="rikvip"], a[href*="bet88"], a[href*="cacuoc"] {
+  a[href*="yo88"], a[href*="rikvip"], a[href*="go88"],
+  a[href*="bet88"], a[href*="6789x.site"], a[href*="cacuoc"],
+  a[href*="utm_medium=topbanner"], a[href*="utm_medium=pc-catfish"],
+  a[href*="utm_campaign=cpd"],
+  iframe[src*="adx"], iframe[src*="catfish"], iframe[src*="banner"],
+  iframe[src*="popads"], iframe[src*="clickadu"] {
     display: none !important;
     visibility: hidden !important;
     pointer-events: none !important;
     opacity: 0 !important;
     height: 0 !important;
+    width: 0 !important;
     overflow: hidden !important;
   }
 `;
@@ -35,7 +45,7 @@ function injectShieldStyles(): void {
   style.textContent = INLINE_SHIELD_CSS;
   if (document.head) {
     document.head.appendChild(style);
-  } else {
+  } else if (document.documentElement) {
     document.documentElement.appendChild(style);
   }
 }
@@ -69,6 +79,34 @@ export function initializeContentProtection(): void {
     );
   }
 
+  // Active continuous DOM cleaner targeting dynamically injected pirate banners
+  function cleanDynamicPirateBanners(): number {
+    if (isYouTube) return 0;
+    let count = 0;
+    const adSelectors = [
+      '[class*="catfish"]', '[id*="catfish"]',
+      '[class*="popup-banner"]', '[id*="popup-banner"]',
+      '[class*="floating-ad"]', '[id*="floating-ad"]',
+      '[class*="banner-top"]', '[id*="banner-top"]',
+      'a[href*="utm_medium="]', 'a[href*="gemwin"]', 'a[href*="haywin"]',
+      'a[href*="uk88"]', 'a[href*="yo88"]', 'a[href*="hitclub"]'
+    ];
+
+    try {
+      const elements = document.querySelectorAll<HTMLElement>(adSelectors.join(','));
+      elements.forEach((el) => {
+        if (el.style.display !== 'none') {
+          el.style.display = 'none';
+          el.style.visibility = 'hidden';
+          el.style.pointerEvents = 'none';
+          count++;
+        }
+      });
+    } catch {}
+
+    return count;
+  }
+
   // Initial and live DOM scanning
   if (typeof document !== 'undefined') {
     if (document.body) {
@@ -91,24 +129,37 @@ export function initializeContentProtection(): void {
         });
       }
 
-      // High-frequency polling loop specifically for YouTube in-stream ads (checks every 250ms)
       setInterval(() => {
         const liveContainer = document.getElementById('movie_player') || document.body;
         const liveVideo = document.querySelector('video');
         if (liveContainer && liveVideo) {
           youTubeEngine.handleInStreamAd(liveVideo, liveContainer);
         }
-      }, 250);
+      }, 100);
     } else {
       const detections = webAdEngine.scanAndClean(document.body);
-      if (detections.length > 0 && typeof chrome !== 'undefined' && chrome.runtime) {
+      const dynamicCount = cleanDynamicPirateBanners();
+      const totalCount = detections.length + dynamicCount;
+
+      if (totalCount > 0 && typeof chrome !== 'undefined' && chrome.runtime) {
         chrome.runtime.sendMessage({
           type: 'INCREMENT_DOM_HIDDEN',
-          payload: { count: detections.length },
+          payload: { count: totalCount },
         });
       }
 
       webAdEngine.startLiveMonitoring(document.body);
+
+      // Continuous high-frequency sweep for dynamic script injections (e.g. adx.js)
+      setInterval(() => {
+        const swept = cleanDynamicPirateBanners();
+        if (swept > 0 && typeof chrome !== 'undefined' && chrome.runtime) {
+          chrome.runtime.sendMessage({
+            type: 'INCREMENT_DOM_HIDDEN',
+            payload: { count: swept },
+          });
+        }
+      }, 500);
     }
   }
 }

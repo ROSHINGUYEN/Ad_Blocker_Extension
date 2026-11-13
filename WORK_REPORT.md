@@ -82,3 +82,29 @@
 - **Vấn đề còn tồn tại:** Không có.
 - **Trạng thái:** PASS
 - **Bước tiếp theo:** Hoàn tất toàn bộ dự án theo Master Prompt v2.0.
+
+
+---
+
+## 2026-11-13 — Full Block Upgrade: Pirate Ad Scripts, Gambling Networks & Real-time DOM Cleaner
+
+- **Mục tiêu:** Chặn triệt để toàn bộ kịch bản chèn banner động (`ads/adx.js`), tab nhảy cá cược/18+, và tự động tua bỏ quảng cáo YouTube in-stream theo phản hồi người dùng.
+- **Tiêu chí hoàn thành:**
+  - Chặn request mạng đối với script quảng cáo rác (`*adx.js*`, `*/ads/*`, `*popunder*`, `*catfish*`). (ĐÃ HOÀN THÀNH)
+  - Chặn toàn bộ dải domain cá cược/cờ bạc: `||haywin.`, `||gemwin.`, `||uk88.`, `||hitclub.`, `||win79.`, `||sunwin.`, `||yo88.`, `||rikvip.`, `||go88.`, `||bet88.`, `||6789x.site`. (ĐÃ HOÀN THÀNH)
+  - Vô hiệu hóa thẻ `<a>` quảng cáo tại sự kiện `click` và `auxclick` (middle click). (ĐÃ HOÀN THÀNH)
+  - Quét liên tục và ẩn sạch các banner động chèn muộn qua CSS shield và DOM sweeper định kỳ 500ms; cập nhật số lượng phần tử ẩn lên popup dashboard. (ĐÃ HOÀN THÀNH)
+  - YouTube skipper: lắng nghe cả `yt-navigate-finish` và `spfdone` kết hợp kiểm tra 50ms để tua 16x và skip ngay lập tức. (ĐÃ HOÀN THÀNH)
+- **Trạng thái ban đầu:** Popup chặn tab nhảy hiển thị 1 nhưng Banner QC = 0 do script `adx.js` chèn banner sau khi DOM load; YouTube SPA navigation chưa được bắt tức thì.
+- **File thay đổi:**
+  - `apps/extension/rules/rules.json`: bổ sung 19 quy tắc DeclarativeNetRequest.
+  - `apps/extension/src/content_main.ts`: tối ưu interval 50ms, bắt sự kiện SPA navigation, chặn link cờ bạc/18+.
+  - `apps/extension/src/content_isolated.ts`: bổ sung bộ quét động `cleanDynamicPirateBanners()` liên tục mỗi 500ms, đồng bộ số lượng `elementsHidden`.
+  - `apps/extension/src/background.ts`: mở rộng danh sách chặn tab ngầm và kết nối `onRuleMatchedDebug` ghi nhận requests đã lọc.
+- **Kiểm thử và kết quả:**
+  - `pnpm test`: 28/28 tests passed.
+  - `pnpm typecheck`: 0 errors trên toàn bộ 8 workspace packages.
+  - `pnpm -C apps/extension build`: build thành công toàn bộ `dist/background.js`, `dist/content_isolated.js`, `dist/content_main.js`.
+- **Vấn đề còn tồn tại:** Không có.
+- **Trạng thái:** PASS
+- **Bước tiếp theo:** Người dùng tải lại tiện ích tại `chrome://extensions/` và tận hưởng trải nghiệm sạch bóng quảng cáo.

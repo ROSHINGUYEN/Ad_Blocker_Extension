@@ -1,42 +1,45 @@
 // Main world script: Direct YouTube Ad Speedup & Window.open Popunder Guard
 (function() {
   // 1. YouTube High-Speed Auto-Skip Engine running in MAIN world (Direct access to HTML5 video element)
-  function setupYouTubeSkipper() {
+  function runYouTubeSkipper() {
     if (!window.location.hostname.includes('youtube.com')) return;
 
-    setInterval(() => {
-      const player = document.getElementById('movie_player') as HTMLElement | null;
-      const video = document.querySelector('video') as HTMLVideoElement | null;
-      if (!player || !video) return;
+    const player = document.getElementById('movie_player') as HTMLElement | null;
+    const video = document.querySelector('video') as HTMLVideoElement | null;
+    if (!player || !video) return;
 
-      const isAd =
-        player.classList.contains('ad-showing') ||
-        player.classList.contains('ad-interrupting') ||
-        Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads'));
+    const isAd =
+      player.classList.contains('ad-showing') ||
+      player.classList.contains('ad-interrupting') ||
+      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module'));
 
-      if (isAd) {
-        // Tắt tiếng tức thì
-        video.muted = true;
-        // Tua nhanh tối đa
-        video.playbackRate = 16.0;
-        // Nhảy thẳng tới cuối clip quảng cáo
-        if (video.duration && isFinite(video.duration)) {
-          video.currentTime = video.duration;
-        }
-
-        // Tự động bấm nút Bỏ qua quảng cáo (Skip Ad)
-        const skipBtn = document.querySelector(
-          '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button, .ytp-ad-skip-button-slot button'
-        ) as HTMLElement | null;
-
-        if (skipBtn) {
-          skipBtn.click();
-        }
+    if (isAd) {
+      // Tắt tiếng tức thì
+      video.muted = true;
+      // Tua nhanh tối đa
+      video.playbackRate = 16.0;
+      // Nhảy thẳng tới cuối clip quảng cáo
+      if (video.duration && isFinite(video.duration)) {
+        video.currentTime = video.duration;
       }
-    }, 100);
+
+      // Tự động bấm nút Bỏ qua quảng cáo (Skip Ad)
+      const skipBtn = document.querySelector(
+        '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button, .ytp-ad-skip-button-slot button'
+      ) as HTMLElement | null;
+
+      if (skipBtn) {
+        skipBtn.click();
+      }
+    }
   }
 
-  setupYouTubeSkipper();
+  // Interval check every 50ms for instant reaction
+  setInterval(runYouTubeSkipper, 50);
+
+  // Hook into YouTube SPA navigation lifecycle
+  window.addEventListener('yt-navigate-finish', runYouTubeSkipper, true);
+  window.addEventListener('spfdone', runYouTubeSkipper, true);
 
   // 2. Intercept window.open popunders
   let lastRealClickTimestamp = 0;
@@ -76,7 +79,7 @@
         const href = anchor.href || anchor.getAttribute('href') || '';
         const lower = href.toLowerCase();
 
-        // Any link containing ad/campaign tracking or gambling signatures
+        // Any link containing ad/campaign tracking, gambling, or adult signatures
         const isAd = (
           lower.includes('utm_medium=topbanner') ||
           lower.includes('utm_medium=pc-catfish') ||
@@ -87,16 +90,22 @@
           lower.includes('hitclub') ||
           lower.includes('win79') ||
           lower.includes('sunwin') ||
+          lower.includes('yo88') ||
+          lower.includes('rikvip') ||
+          lower.includes('go88') ||
+          lower.includes('bet88') ||
+          lower.includes('6789x.site') ||
           lower.includes('cacuoc') ||
           lower.includes('gamebai') ||
-          lower.includes('nhacai')
+          lower.includes('nhacai') ||
+          lower.includes('sex') ||
+          lower.includes('xxx')
         );
 
         if (isAd) {
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();
-          // Remove or neutralize the anchor immediately
           anchor.removeAttribute('href');
           anchor.style.pointerEvents = 'none';
           window.postMessage({ type: 'SHIORI_CLICK_BLOCKED', url: href }, '*');
@@ -108,5 +117,5 @@
   }
 
   window.addEventListener('click', handleLinkClick, true);
-  window.addEventListener('auxclick', handleLinkClick, true); // middle click support
+  window.addEventListener('auxclick', handleLinkClick, true);
 })();
