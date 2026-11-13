@@ -33,6 +33,51 @@
     } catch {}
   }
 
+  // --------------------------------------------------------------------------
+  // YOUTUBE AD HUNTER & 16X FAST-SKIP TERMINATOR
+  // --------------------------------------------------------------------------
+  const YOUTUBE_AD_INDICATORS = [
+    '.ad-showing',
+    '.ad-interrupting',
+    '.ytp-ad-player-overlay',
+    '.ytp-ad-text',
+    '.ytp-ad-module',
+    '.ytp-ad-badge',
+    '.ytp-ad-overlay-container',
+    'ytd-ad-slot-renderer',
+    'ytd-player-legacy-desktop-watch-ads-renderer',
+    '[class*="ytp-ad-"]',
+    '[class*="skip-button"]'
+  ];
+
+  const YOUTUBE_SKIP_BUTTONS = [
+    '.ytp-ad-skip-button-modern',
+    '.ytp-skip-ad-button',
+    '.ytp-ad-skip-button',
+    '.ytp-ad-skip-button-slot button',
+    'button.ytp-ad-skip-button-text',
+    '.ytp-ad-skip-button-container button',
+    '.videoAdUiSkipButton',
+    '[class*="skip-button"]',
+    'div.ytp-ad-text',
+    'button[id*="skip"]'
+  ];
+
+  function detectYouTubeAd(): boolean {
+    const player = document.getElementById('movie_player') as HTMLElement | null;
+    if (player) {
+      if (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')) {
+        return true;
+      }
+    }
+    for (const selector of YOUTUBE_AD_INDICATORS) {
+      if (document.querySelector(selector)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function handleYouTubeAdState() {
     if (!isExtensionEnabled) return;
     if (!window.location.hostname.includes('youtube.com')) return;
@@ -41,69 +86,53 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // CHECK CHÍNH XÁC: Phát hiện quảng cáo in-stream (kể cả quảng cáo không thể bỏ qua Aquafina 0:05)
-    const isRealAdPlaying = Boolean(
-      player.classList?.contains('ad-showing') ||
-      player.classList?.contains('ad-interrupting') ||
-      document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, [class*="ytp-ad-module"], ytd-ad-slot-renderer')
-    );
+    const isAdActive = detectYouTubeAd();
 
-    if (isRealAdPlaying) {
-      // 1. Tắt tiếng ad để không làm phiền người dùng
+    if (isAdActive) {
+      // 1. Tắt tiếng ngay lập tức để không làm ồn
       video.muted = true;
 
-      // 2. Với quảng cáo ngắn/không thể bỏ qua (như Aquafina 5s, Dola 15s, Topview 15s):
-      // Đẩy currentTime về duration để kết thúc ngay lập tức trong 0.05s
+      // 2. Kích hoạt chế độ 16x Fast-Forward: Tua tốc độ tối đa 16x & nhảy thẳng về cuối quảng cáo
+      video.playbackRate = 16.0;
       if (video.duration && isFinite(video.duration) && video.duration > 0) {
-        video.playbackRate = 16.0;
         if (video.currentTime < video.duration - 0.1) {
           video.currentTime = video.duration;
         }
       }
 
-      // 3. Click nút Skip Ad ngay lập tức nếu có
+      // 3. Tự động gọi API bỏ qua nếu player hỗ trợ
       try {
         if (typeof player.skipAd === 'function') {
           player.skipAd();
         }
       } catch {}
 
-      const skipSelectors = [
-        '.ytp-ad-skip-button-modern',
-        '.ytp-skip-ad-button',
-        '.ytp-ad-skip-button',
-        '.ytp-ad-skip-button-slot button',
-        'button.ytp-ad-skip-button-text',
-        '.ytp-ad-skip-button-container button',
-        '.videoAdUiSkipButton',
-        '[class*="skip-button"]'
-      ];
-
-      for (const sel of skipSelectors) {
+      // 4. Tự động click đồng loạt tất cả nút "Bỏ qua" / "Skip Ad"
+      for (const sel of YOUTUBE_SKIP_BUTTONS) {
         const btns = document.querySelectorAll<HTMLElement>(sel);
         btns.forEach((btn) => {
           dispatchClick(btn);
         });
       }
 
-      // Quét thêm bất kỳ button nào có chữ "Bỏ qua" hoặc "Skip"
+      // Quét thêm bất kỳ button nào có nội dung chứa chữ "Bỏ qua" hoặc "Skip"
       const allButtons = document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text');
       allButtons.forEach((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
-        if (txt.includes('bỏ qua') || txt.includes('skip')) {
+        if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
           dispatchClick(btn);
         }
       });
     } else {
-      // Khi video chính phát: Khôi phục tốc độ 1.0x chuẩn tuyệt đối
+      // Khi quảng cáo kết thúc và video chính phát: Đưa tốc độ về 1.0x bình thường
       if (video.playbackRate > 1.0) {
         video.playbackRate = 1.0;
       }
     }
   }
 
-  // Quét định kỳ 50ms và dùng MutationObserver để bắt ad ngay tích tắc
-  setInterval(handleYouTubeAdState, 50);
+  // Quét vòng lặp nhanh 30ms kết hợp MutationObserver để bắt kịp quảng cáo ngay mili-giây đầu tiên
+  setInterval(handleYouTubeAdState, 30);
 
   const adObserver = new MutationObserver(handleYouTubeAdState);
   if (document.documentElement) {
