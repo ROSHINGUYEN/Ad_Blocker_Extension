@@ -169,3 +169,20 @@
   - `pnpm typecheck`: 0 errors.
   - Build pipeline: build thành công `dist/` và `popup/`.
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-13 — Shiori Mobile App Architecture Implementation (`apps/mobile`)
+
+- **Mục tiêu:** Xây dựng ứng dụng di động độc lập SHIORI MOBILE (`apps/mobile`) dành cho điện thoại thông minh (Android & iOS) để duyệt web sạch, xem YouTube không quảng cáo, chặn mã độc/18+ và tối ưu RAM trên di động.
+- **Tiêu chí hoàn thành:**
+  - Khởi tạo package `apps/mobile` trong Monorepo, liên kết trực tiếp với các Core Engines (`shared`, `rules-engine`, `web-ad-engine`, `youtube-engine`, `intelligence-engine`). (ĐÃ HOÀN THÀNH)
+  - Thiết kế giao diện Mobile-first chuẩn Cyberpunk Glassmorphism: Header với biểu tượng Khiên Shiori phát sáng, Omnibox thanh tìm kiếm thông minh, thẻ theo dõi thông số an ninh, phím tắt nhanh YouTube Clean/Phim sạch/Báo chí, thanh điều hướng đáy (Bottom Bar). (ĐÃ HOÀN THÀNH)
+  - Hệ thống an ninh di động (Parental & Security Null-Routing Shield): Tự động chặn đứng các đường link truy cập web đen (18+, sex, hentai, jav, vlxx) và cờ bạc độc hại (gemwin, tic88, uk88, haywin). (ĐÃ HOÀN THÀNH)
+  - Nút bấm tối ưu RAM di động: hỗ trợ dọn dẹp bộ nhớ đệm và giải phóng các tab ngầm. (ĐÃ HOÀN THÀNH)
+- **Kiểm thử và kết quả:**
+  - `pnpm test`: 28/28 tests passed.
+  - `pnpm typecheck`: 0 errors trên toàn bộ 9 workspace packages.
+  - Biên dịch ứng dụng di động bằng Vite: thành công 100%, bundle sẵn sàng trong `apps/mobile/dist/`.
+- **Trạng thái:** PASS

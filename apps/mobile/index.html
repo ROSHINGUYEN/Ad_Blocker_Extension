@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SHIORI MOBILE — Smart Ad Blocker & Safe Browser</title>
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top App Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <img src="/icon.png" alt="Shiori Shield" class="brand-shield">
+        <div class="brand-text">
+          <h1>SHIORI MOBILE</h1>
+          <span class="sub-status"><span class="dot-online"></span> Zero-Trust Protected</span>
+        </div>
+      </div>
+      <button class="btn-ram" id="btn-clean-ram">⚡ Dọn RAM</button>
+    </header>
+
+    <!-- Omnibox Search & URL Bar -->
+    <div class="omnibox-container">
+      <form id="browser-form" class="omnibox-form">
+        <span class="lock-icon">🔒</span>
+        <input type="text" id="url-input" placeholder="Nhập tên trang web hoặc tìm kiếm..." autocomplete="off">
+        <button type="submit" class="btn-go">Đi</button>
+      </form>
+    </div>
+
+    <!-- Quick Shortcuts / Dashboard -->
+    <main class="dashboard-content" id="dashboard-view">
+      <!-- Protection Metric Cards -->
+      <section class="stats-overview">
+        <div class="stat-card glow-cyan">
+          <span class="stat-num" id="stat-popups">0</span>
+          <span class="stat-title">Tab nhảy & Link lừa đảo</span>
+        </div>
+        <div class="stat-card glow-purple">
+          <span class="stat-num" id="stat-banners">0</span>
+          <span class="stat-title">Banner QC & Catfish</span>
+        </div>
+        <div class="stat-card glow-green">
+          <span class="stat-num" id="stat-yt">0</span>
+          <span class="stat-title">YouTube Ads Auto-Skip</span>
+        </div>
+      </section>
+
+      <!-- Clean Hub Shortcuts -->
+      <section class="hub-shortcuts">
+        <h2 class="section-title">TRẢI NGHIỆM KHÔNG QUẢNG CÁO</h2>
+        <div class="shortcut-grid">
+          <button class="shortcut-btn" data-url="https://m.youtube.com">
+            <span class="shortcut-icon red-glow">▶️</span>
+            <span class="shortcut-name">YouTube Clean</span>
+          </button>
+          <button class="shortcut-btn" data-url="https://animevietsub.best">
+            <span class="shortcut-icon purple-glow">🎬</span>
+            <span class="shortcut-name">Phim Lậu Sạch</span>
+          </button>
+          <button class="shortcut-btn" data-url="https://google.com">
+            <span class="shortcut-icon blue-glow">🔍</span>
+            <span class="shortcut-name">Google Search</span>
+          </button>
+          <button class="shortcut-btn" data-url="https://vnexpress.net">
+            <span class="shortcut-icon green-glow">📰</span>
+            <span class="shortcut-name">Báo chí Sạch</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Security Guard Details -->
+      <section class="security-panel">
+        <h2 class="section-title">HỆ THỐNG AN NINH MẠNG DI ĐỘNG</h2>
+        <div class="guard-item">
+          <div class="guard-info">
+            <strong>🛡️ Chặn 18+, Sex, Hentai, Phim người lớn</strong>
+            <span>Lọc ở tầng mạng, cô lập các domain độc hại</span>
+          </div>
+          <span class="badge active">BẬT</span>
+        </div>
+        <div class="guard-item">
+          <div class="guard-info">
+            <strong>🚫 Diệt mã độc & Cờ bạc (Gemwin, Tic88, Uk88)</strong>
+            <span>Triệt tiêu tab nhảy và bẫy click 0ms</span>
+          </div>
+          <span class="badge active">BẬT</span>
+        </div>
+        <div class="guard-item">
+          <div class="guard-info">
+            <strong>⚡ Tối ưu RAM & Giải phóng Ổ nhớ</strong>
+            <span>Tự động giải phóng bộ nhớ khi rời tab</span>
+          </div>
+          <span class="badge active">BẬT</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- Browser Sandbox View -->
+    <div class="browser-viewport hidden" id="browser-viewport">
+      <div class="browser-actions">
+        <button id="btn-browser-back" class="nav-btn">◀</button>
+        <button id="btn-browser-home" class="nav-btn">🏠</button>
+        <span id="browser-current-domain" class="current-site-txt">Đang tải...</span>
+        <button id="btn-browser-reload" class="nav-btn">🔄</button>
+      </div>
+      <iframe id="browser-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" class="safe-webview"></iframe>
+    </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" id="nav-home">
+        <span class="nav-icon">🛡️</span>
+        <span class="nav-txt">Bảo vệ</span>
+      </button>
+      <button class="nav-item" id="nav-browser">
+        <span class="nav-icon">🌐</span>
+        <span class="nav-txt">Trình duyệt</span>
+      </button>
+      <button class="nav-item" id="nav-ram">
+        <span class="nav-icon">⚡</span>
+        <span class="nav-txt">Dọn RAM</span>
+      </button>
+    </nav>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
