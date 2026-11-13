@@ -1,8 +1,8 @@
 {
-  "name": "shiori-ad-cleaner-monorepo",
-  "version": "0.1.0",
+  "name": "ad-blocker-extension",
+  "version": "1.0.0",
   "private": true,
-  "description": "SHIORI AD CLEANER — Smart Ad Blocking & Browser Protection System",
+  "description": "Ad Blocker Extension — Trình chặn quảng cáo thông minh, bảo vệ duyệt web & tối ưu bộ nhớ",
   "scripts": {
     "build": "pnpm -r run build",
     "test": "vitest run",
