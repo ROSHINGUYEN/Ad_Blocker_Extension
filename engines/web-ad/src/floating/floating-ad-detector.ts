@@ -1,92 +1,92 @@
 import { DetectionResult, generateDetectionId } from '@shiori/shared';
 
-const GAMBLING_AFFILIATE_KEYWORDS = [
-  'uk88',
-  'hitclub',
-  'win79',
-  'sunwin',
-  'rikvip',
-  'bet88',
-  'fb88',
-  'fun88',
-  'w88',
-  'shbet',
-  'jun88',
-  'new88',
-  '789club',
-  'b52',
-  'iwin',
-  'go88',
-  'cacuoc',
-  'gamebai',
-  'nhacai',
-  'nohu',
-  'quayhu',
-  'taixiu',
-];
-
 export class FloatingAdDetector {
   /**
-   * Scans an element for center floating modal ads or sticky bottom banners.
+   * Pure Structural & Geometric Heuristic Analysis:
+   * Detects intrusive modal popups and sticky footer bars by coordinates, z-index,
+   * aspect ratio, and backdrop properties — ZERO hardcoded keywords required!
    */
-  public analyzeElement(element: HTMLElement): DetectionResult | null {
+  public analyzeElement(element: HTMLElement, currentHost?: string): DetectionResult | null {
     if (!element || element.nodeType !== 1) return null;
+
+    // Never inspect core HTML tags or video elements
+    const tag = element.tagName.toLowerCase();
+    if (['html', 'body', 'video', 'main', 'article', 'header', 'nav'].includes(tag)) {
+      return null;
+    }
 
     const reasons: string[] = [];
     let isAd = false;
+    let confidence = 0.0;
 
-    // 1. Check for gambling affiliate link inside or on the element itself
-    const href = element.getAttribute('href') || '';
-    const onclick = element.getAttribute('onclick') || '';
-    const elementTextAndHref = `${href} ${onclick} ${element.innerHTML}`.toLowerCase();
-
-    for (const kw of GAMBLING_AFFILIATE_KEYWORDS) {
-      if (elementTextAndHref.includes(kw)) {
-        reasons.push(`Contains gambling / illegal betting keyword: "${kw}"`);
-        isAd = true;
-        break;
-      }
-    }
-
-    // 2. Geometry & CSS Check: Fixed Center Modal or Bottom Floating Bar
     const style = element.style;
     const computedPosition = style.position || '';
     const zIndex = parseInt(style.zIndex || '0', 10);
     const bottom = style.bottom;
 
-    // Center floating modal (often has high z-index and fixed or absolute)
+    // 1. Structural Fixed Center Modal Detection (like the UK88 pop-up in middle of screen)
+    // - Must be fixed or absolute
+    // - Must have high z-index (>= 999)
+    // - Usually contains images with an anchor linking out of the current domain
     if ((computedPosition === 'fixed' || computedPosition === 'absolute') && zIndex >= 999) {
-      // If it also contains an image with a link or close button (X)
-      const hasCloseButton = Boolean(
-        element.querySelector('[class*="close"], [id*="close"], svg, img[src*="close"]') ||
+      const links = element.querySelectorAll<HTMLAnchorElement>('a[href]');
+      let hasOutboundLink = false;
+
+      if (currentHost && links.length > 0) {
+        for (let i = 0; i < links.length; i++) {
+          const link = links[i];
+          if (!link) continue;
+          try {
+            const linkHost = new URL(link.href).hostname.toLowerCase();
+            if (linkHost && !linkHost.endsWith(currentHost) && !currentHost.endsWith(linkHost)) {
+              hasOutboundLink = true;
+              break;
+            }
+          } catch {
+            // Ignore relative links
+          }
+        }
+      }
+
+      // Check if modal has an image or canvas taking up most of it
+      const images = element.querySelectorAll('img, canvas, svg');
+      const hasCloseIndicator = Boolean(
+        element.querySelector('[class*="close"], [id*="close"], [aria-label*="close"]') ||
         element.textContent?.includes('✕') ||
         element.textContent?.includes('×')
       );
-      if (hasCloseButton || isAd) {
-        reasons.push(`High z-index floating overlay modal (z-index: ${zIndex})`);
+
+      if ((hasOutboundLink || images.length > 0) && (hasCloseIndicator || zIndex >= 9999)) {
+        reasons.push(`Geometric intrusive floating modal (position: ${computedPosition}, z-index: ${zIndex})`);
+        confidence = 0.95;
         isAd = true;
       }
     }
 
-    // Sticky bottom banner
+    // 2. Structural Sticky Bottom Bar Detection (Banner pinned at bottom of viewport)
     if (computedPosition === 'fixed' && (bottom === '0px' || bottom === '0')) {
-      reasons.push('Fixed sticky bottom banner container');
-      isAd = true;
+      const links = element.querySelectorAll('a[href]');
+      if (links.length > 0) {
+        reasons.push('Fixed sticky bottom viewport obstruction bar');
+        confidence = 0.90;
+        isAd = true;
+      }
     }
 
-    // Class / ID naming inspection
+    // 3. Common Ad Framework Naming Conventions (Fallback)
     const idClass = `${element.id} ${element.className}`.toLowerCase();
-    if (/\b(popup-banner|floating-banner|ad-bottom|banner-center|ads-modal|adv_center)\b/i.test(idClass)) {
-      reasons.push(`Matched ad banner class/id convention: "${idClass}"`);
+    if (/\b(popup-banner|floating-banner|ad-bottom|banner-center|ads-modal|adv_center|floating-ad)\b/i.test(idClass)) {
+      reasons.push(`Ad naming convention detected: "${idClass}"`);
+      confidence = Math.max(confidence, 0.85);
       isAd = true;
     }
 
-    if (isAd) {
+    if (isAd && confidence >= 0.85) {
       return {
-        detectionId: generateDetectionId('floating_ad'),
+        detectionId: generateDetectionId('heuristic_ad'),
         sourceEngine: 'web-ad',
         category: 'CONFIRMED_AD',
-        confidence: 0.95,
+        confidence,
         evidence: {
           reasons,
         },

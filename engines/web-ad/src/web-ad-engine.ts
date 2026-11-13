@@ -49,7 +49,7 @@ export class ShioriWebAdEngine {
     // 2. Scan Floating Modals, Sticky Bottom Bars & Gambling Links
     if (this.config.enableFloatingAdScanning !== false) {
       // Check the rootElement itself if it matches floating ad criteria
-      const rootFloating = this.floatingDetector.analyzeElement(rootElement);
+      const rootFloating = this.floatingDetector.analyzeElement(rootElement, this.config.currentHostname);
       if (rootFloating && rootFloating.recommendedAction === 'HIDE') {
         this.restorationManager.hideElement(rootElement, rootFloating.evidence.reasons.join(', '));
         detections.push(rootFloating);
@@ -57,10 +57,10 @@ export class ShioriWebAdEngine {
 
       // Check candidate elements inside
       const floatingCandidates = rootElement.querySelectorAll<HTMLElement>(
-        'div, aside, section, a[href*="http"], [class*="popup"], [class*="banner"], [class*="floating"], [id*="popup"], [id*="banner"]'
+        'div, aside, section, [class*="popup"], [class*="banner"], [class*="floating"], [id*="popup"], [id*="banner"]'
       );
       floatingCandidates.forEach((el) => {
-        const result = this.floatingDetector.analyzeElement(el);
+        const result = this.floatingDetector.analyzeElement(el, this.config.currentHostname);
         if (result && result.recommendedAction === 'HIDE') {
           this.restorationManager.hideElement(el, result.evidence.reasons.join(', '));
           detections.push(result);

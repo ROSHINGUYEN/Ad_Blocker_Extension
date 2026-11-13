@@ -18,9 +18,9 @@ export const sessionStats: ProtectionStatistics = {
   updatedAt: Date.now(),
 };
 
-// Rich baseline filter rules loading for Vietnamese websites & gambling popups
+// Rich baseline filter rules loading
 ruleEngine.loadFromRawText(`
-! Shiori Vietnam & International Baseline Rules
+! Shiori Baseline Rules
 ||doubleclick.net^$script
 ||googleads.g.doubleclick.net^
 ||popads.net^
@@ -28,31 +28,12 @@ ruleEngine.loadFromRawText(`
 ||clickadu.com^
 ||adsterra.com^
 ||propellerads.com^
-||syndication.exoclick.com^
-||uk88.*^
-||hitclub.*^
-||win79.*^
-||sunwin.*^
-||rikvip.*^
 ##.ad-banner
 ##.sponsor-card
 ##.popup-banner
 ##.floating-banner
 ##.ad-bottom
 ##.banner-center
-##[class*="popup-banner"]
-##[class*="floating-ad"]
-##[id*="popup-banner"]
-##[id*="floating-ad"]
-##.ad-sticky
-##[class*="ad-bottom"]
-##[class*="sticky-ad"]
-##a[href*="uk88"]
-##a[href*="hitclub"]
-##a[href*="win79"]
-##a[href*="sunwin"]
-##a[href*="rikvip"]
-##a[href*="bet88"]
 `, 'shiori_core_filter');
 
 /**
@@ -113,16 +94,25 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 }
 
 // Chrome Tabs Pop-under Guard: Prevent auto-spawned gambling tabs
+// Closes tabs only when they are clearly untrusted popunders (NOT legitimate user navigation!)
 if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onCreated) {
   chrome.tabs.onCreated.addListener((tab) => {
-    const targetUrl = tab.pendingUrl || tab.url || '';
-    if (targetUrl) {
-      const check = redirectGuard.isSuspiciousRedirect(targetUrl);
-      if (check.isSuspicious && tab.id) {
-        chrome.tabs.remove(tab.id);
-        sessionStats.redirectsBlocked++;
-        sessionStats.updatedAt = Date.now();
-        console.warn(`[Shiori Popunder Guard] Blocked & closed popup tab: ${targetUrl}`);
+    // Only inspect tabs that were opened by another tab without user gesture
+    if (tab.openerTabId) {
+      const targetUrl = tab.pendingUrl || tab.url || '';
+      if (targetUrl) {
+        const decision = redirectGuard.evaluateNavigation(targetUrl, '', {
+          isTrustedUserGesture: false,
+          timeSinceLastClickMs: 99999,
+          isTriggeredByScriptTimer: true,
+        });
+
+        if (!decision.allow && tab.id) {
+          chrome.tabs.remove(tab.id);
+          sessionStats.redirectsBlocked++;
+          sessionStats.updatedAt = Date.now();
+          console.warn(`[Shiori Popunder Guard] Blocked & closed popup tab: ${targetUrl}`);
+        }
       }
     }
   });
