@@ -10,6 +10,59 @@ export class ShioriYouTubeEngine {
   public observer = new YouTubePlayerObserver();
   public uiDetector = new YouTubeUIDetector();
 
+  private isCurrentlyHandlingAd = false;
+  private originalMutedState = false;
+  private originalPlaybackRate = 1.0;
+
+  /**
+   * Fast-forwards and auto-skips YouTube In-stream Video Ads seamlessly.
+   */
+  public handleInStreamAd(video: HTMLVideoElement | null, container: HTMLElement): boolean {
+    if (!video || !this.circuitBreaker.canIntervene()) {
+      return false;
+    }
+
+    const isAdPlaying =
+      container.classList.contains('ad-showing') ||
+      container.classList.contains('ad-interrupting') ||
+      Boolean(container.querySelector('.ytp-ad-player-overlay, .ytp-ad-text'));
+
+    if (isAdPlaying) {
+      if (!this.isCurrentlyHandlingAd) {
+        this.isCurrentlyHandlingAd = true;
+        this.originalMutedState = video.muted;
+        this.originalPlaybackRate = video.playbackRate || 1.0;
+      }
+
+      // 1. Mute audio instantly so the user hears zero ad noise
+      video.muted = true;
+
+      // 2. Fast forward ad at maximum possible speed (16x) and seek to end
+      video.playbackRate = 16.0;
+      if (video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
+        video.currentTime = video.duration;
+      }
+
+      // 3. Auto click skip button if available
+      const skipButton = container.querySelector<HTMLElement>(
+        '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-text, .ytp-skip-ad-button'
+      );
+      if (skipButton) {
+        skipButton.click();
+      }
+
+      return true;
+    } else {
+      // Restore normal playback if we were handling an ad
+      if (this.isCurrentlyHandlingAd) {
+        this.isCurrentlyHandlingAd = false;
+        video.muted = this.originalMutedState;
+        video.playbackRate = this.originalPlaybackRate;
+      }
+      return false;
+    }
+  }
+
   /**
    * Evaluates the current YouTube page / player state.
    */
@@ -25,6 +78,22 @@ export class ShioriYouTubeEngine {
         this.circuitBreaker.recordError(snapshot.errorMessage || 'Unknown playback error');
       } else if (snapshot.isPlaying) {
         this.circuitBreaker.recordSuccess();
+      }
+
+      // Handle In-stream Video Ads
+      const handled = this.handleInStreamAd(video, container);
+      if (handled) {
+        results.push({
+          detectionId: generateDetectionId('yt_instream'),
+          sourceEngine: 'youtube',
+          category: 'CONFIRMED_AD',
+          confidence: 0.99,
+          evidence: {
+            reasons: ['In-stream video ad detected: audio muted, fast-forwarded 16x and skipped'],
+          },
+          recommendedAction: 'HIDE',
+          timestamp: Date.now(),
+        });
       }
     }
 

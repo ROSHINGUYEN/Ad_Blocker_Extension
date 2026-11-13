@@ -90,6 +90,15 @@ export function initializeContentProtection(): void {
           payload: { count: ytDetections.length },
         });
       }
+
+      // High-frequency polling loop specifically for YouTube in-stream ads (checks every 250ms)
+      setInterval(() => {
+        const liveContainer = document.getElementById('movie_player') || document.body;
+        const liveVideo = document.querySelector('video');
+        if (liveContainer && liveVideo) {
+          youTubeEngine.handleInStreamAd(liveVideo, liveContainer);
+        }
+      }, 250);
     } else {
       const detections = webAdEngine.scanAndClean(document.body);
       if (detections.length > 0 && typeof chrome !== 'undefined' && chrome.runtime) {

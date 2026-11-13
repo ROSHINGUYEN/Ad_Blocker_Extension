@@ -20,17 +20,16 @@
         !urlStr.includes(currentHost)
       );
 
-      // Block unprompted or third-party popunder
+      // Block unprompted or third-party popunder silently (NO console.warn to avoid Chrome error log badge)
       if (timeSinceClick > 500 || isThirdParty) {
-        console.warn('[Shiori Popunder Guard] Blocked window.open:', urlStr);
         window.postMessage({ type: 'SHIORI_POPUP_BLOCKED', url: urlStr }, '*');
         return null;
       }
 
       return originalOpen.call(window, url, target, features);
     };
-  } catch (err) {
-    console.error('[Shiori] Failed to override window.open:', err);
+  } catch {
+    // Suppress errors silently
   }
 
   // Intercept click hijacking on the document
@@ -53,7 +52,6 @@
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();
-          console.warn('[Shiori Click Guard] Suppressed ad click:', href);
           window.postMessage({ type: 'SHIORI_CLICK_BLOCKED', url: href }, '*');
           return;
         }
