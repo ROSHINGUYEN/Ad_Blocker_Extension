@@ -108,3 +108,24 @@
 - **Vấn đề còn tồn tại:** Không có.
 - **Trạng thái:** PASS
 - **Bước tiếp theo:** Người dùng tải lại tiện ích tại `chrome://extensions/` và tận hưởng trải nghiệm sạch bóng quảng cáo.
+
+
+---
+
+## 2026-11-13 — Zero-Latency Click Guard, YouTube Sterilization & Canvas Shield Brand Icons
+
+- **Mục tiêu:** 
+  1. Triệt tiêu hoàn toàn độ trễ 1-2s khi click link quảng cáo (bảo vệ tức thì 0ms, không cho mở tab trước khi đóng).
+  2. Xử lý triệt để quảng cáo video YouTube bằng cơ chế đa sự kiện (`play`, `timeupdate`, `yt-navigate-finish`).
+  3. Tạo bộ icon nhận diện thương hiệu hình Khiên Bảo Vệ Shiori (Canvas/PNG) cho Extension (`16x16`, `48x48`, `128x128`) và nhúng vào `manifest.json`, Popup UI.
+- **Tiêu chí hoàn thành:**
+  - Can thiệp sự kiện ngay tại `pointerdown` và `mousedown` trước khi chuột nhả (`mouseup`/`click`), loại bỏ `href` và `target="_blank"` của link độc hại ngay lập tức. (ĐÃ HOÀN THÀNH)
+  - Thêm bộ lọc `chrome.webNavigation.onBeforeNavigate` tại Service Worker để đóng tab ngay trước khi gói tin mạng đầu tiên được gửi. (ĐÃ HOÀN THÀNH)
+  - YouTube player ad: can thiệp trực tiếp thẻ `<video>` trên mọi sự kiện `timeupdate`, tắt tiếng (`muted=true`), đẩy tốc độ lên `16x`, ép `currentTime=duration` và tự động click nút skip. (ĐÃ HOÀN THÀNH)
+  - Sinh thành công bộ 3 icons chuẩn PNG chất lượng cao: `icon16.png`, `icon48.png`, `icon128.png` và cấu hình trong `manifest.json`. (ĐÃ HOÀN THÀNH)
+- **Kiểm thử và kết quả:**
+  - `pnpm test`: 28/28 tests passed.
+  - `pnpm typecheck`: 0 errors.
+  - `pnpm -C apps/extension build`: build thành công toàn bộ bundle.
+- **Trạng thái:** PASS
+- **Bước tiếp theo:** Người dùng reload tiện ích tại `chrome://extensions/` để kiểm tra trực tiếp.

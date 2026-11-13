@@ -9,11 +9,11 @@
   },
   "dependencies": {
     "@shiori/intelligence-engine": "workspace:*",
+    "@shiori/redirect-guard": "workspace:*",
     "@shiori/rules-engine": "workspace:*",
     "@shiori/shared": "workspace:*",
     "@shiori/web-ad-engine": "workspace:*",
-    "@shiori/youtube-engine": "workspace:*",
-    "@shiori/redirect-guard": "workspace:*"
+    "@shiori/youtube-engine": "workspace:*"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.308",

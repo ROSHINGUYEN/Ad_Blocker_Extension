@@ -9,7 +9,7 @@ const localRuleEngine = new ShioriRuleEngine();
 const webAdEngine = new ShioriWebAdEngine(localRuleEngine, { currentHostname });
 const youTubeEngine = new ShioriYouTubeEngine();
 
-// Powerful instant shield stylesheet targeting ad banners, catfish, floating popups, sticky footers, and gambling
+// Instant shield stylesheet targeting ad banners, catfish, floating popups, sticky footers, and YouTube player ads
 const INLINE_SHIELD_CSS = `
   [class*="catfish"], [id*="catfish"],
   [class*="popup-banner"], [id*="popup-banner"],
@@ -28,7 +28,11 @@ const INLINE_SHIELD_CSS = `
   a[href*="utm_medium=topbanner"], a[href*="utm_medium=pc-catfish"],
   a[href*="utm_campaign=cpd"],
   iframe[src*="adx"], iframe[src*="catfish"], iframe[src*="banner"],
-  iframe[src*="popads"], iframe[src*="clickadu"] {
+  iframe[src*="popads"], iframe[src*="clickadu"],
+  /* YouTube ad containers overlay */
+  .ytp-ad-overlay-container, .ytp-ad-message-container,
+  ytd-ad-slot-renderer, #player-ads, ytd-banner-promo-renderer,
+  ytd-in-feed-ad-layout-renderer {
     display: none !important;
     visibility: hidden !important;
     pointer-events: none !important;
@@ -79,7 +83,7 @@ export function initializeContentProtection(): void {
     );
   }
 
-  // Active continuous DOM cleaner targeting dynamically injected pirate banners
+  // Active continuous DOM cleaner targeting dynamically injected banners
   function cleanDynamicPirateBanners(): number {
     if (isYouTube) return 0;
     let count = 0;
@@ -135,7 +139,7 @@ export function initializeContentProtection(): void {
         if (liveContainer && liveVideo) {
           youTubeEngine.handleInStreamAd(liveVideo, liveContainer);
         }
-      }, 100);
+      }, 50);
     } else {
       const detections = webAdEngine.scanAndClean(document.body);
       const dynamicCount = cleanDynamicPirateBanners();
@@ -150,7 +154,7 @@ export function initializeContentProtection(): void {
 
       webAdEngine.startLiveMonitoring(document.body);
 
-      // Continuous high-frequency sweep for dynamic script injections (e.g. adx.js)
+      // Continuous high-frequency sweep for dynamic script injections
       setInterval(() => {
         const swept = cleanDynamicPirateBanners();
         if (swept > 0 && typeof chrome !== 'undefined' && chrome.runtime) {

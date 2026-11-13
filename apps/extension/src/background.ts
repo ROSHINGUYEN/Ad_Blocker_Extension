@@ -8,7 +8,7 @@ export const ruleEngine = new ShioriRuleEngine();
 export const intelligenceEngine = new ShioriIntelligenceEngine();
 export const redirectGuard = new RedirectGuard();
 
-// Persistent metrics tracking: STRICTLY separate requestsFiltered from elementsHidden
+// Persistent metrics tracking
 export const sessionStats: ProtectionStatistics = {
   requestsFiltered: 0,
   elementsHidden: 0,
@@ -18,7 +18,7 @@ export const sessionStats: ProtectionStatistics = {
   updatedAt: Date.now(),
 };
 
-// Rich baseline filter rules loading
+// Baseline filter rules loading
 ruleEngine.loadFromRawText(`
 ! Shiori Baseline Rules
 ||doubleclick.net^$script
@@ -51,9 +51,6 @@ ruleEngine.loadFromRawText(`
 ##[id*="catfish"]
 `, 'shiori_core_filter');
 
-/**
- * Handles communication from Content Scripts and Popup.
- */
 export function handleExtensionMessage(
   message: { type: string; payload?: any },
   _sender: any,
@@ -103,12 +100,11 @@ export function handleExtensionMessage(
   return true;
 }
 
-// In extension runtime, bind chrome runtime listeners
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener(handleExtensionMessage);
 }
 
-// Listen to declarativeNetRequest matched rules to accurately reflect Network Filtered count
+// Track Declarative Net Request blocks
 if (typeof chrome !== 'undefined' && chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDebug) {
   chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((_info) => {
     sessionStats.requestsFiltered++;
@@ -116,13 +112,11 @@ if (typeof chrome !== 'undefined' && chrome.declarativeNetRequest && chrome.decl
   });
 }
 
-// Background Tab Creation & Update Guard:
-// If a tab is spawned pointing to gambling tracking patterns or triggered by third-party links, close it immediately!
-function checkAndCloseSuspiciousTab(tabId: number, url: string, _openerTabId?: number) {
-  if (!url || url === 'about:blank') return;
-
+// Check if a URL matches malicious/ad patterns
+function isSuspiciousUrl(url: string): boolean {
+  if (!url || url === 'about:blank') return false;
   const lower = url.toLowerCase();
-  const isGamblingOrAdTracking = (
+  return (
     lower.includes('utm_medium=topbanner') ||
     lower.includes('utm_medium=pc-catfish') ||
     lower.includes('utm_campaign=cpd') ||
@@ -141,22 +135,33 @@ function checkAndCloseSuspiciousTab(tabId: number, url: string, _openerTabId?: n
     lower.includes('gamebai') ||
     lower.includes('nhacai') ||
     lower.includes('popads') ||
-    lower.includes('clickadu')
+    lower.includes('clickadu') ||
+    lower.includes('adsterra') ||
+    lower.includes('propellerads')
   );
-
-  if (isGamblingOrAdTracking && tabId) {
-    chrome.tabs.remove(tabId);
-    sessionStats.redirectsBlocked++;
-    sessionStats.updatedAt = Date.now();
-  }
 }
 
+// 0MS ZERO-LATENCY INTERCEPTION: Kill tab before navigation occurs!
+if (typeof chrome !== 'undefined' && chrome.webNavigation && chrome.webNavigation.onBeforeNavigate) {
+  chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+    // Only check tabs (frameId === 0 is the main window)
+    if (details.frameId === 0 && details.tabId > 0 && isSuspiciousUrl(details.url)) {
+      chrome.tabs.remove(details.tabId).catch(() => {});
+      sessionStats.redirectsBlocked++;
+      sessionStats.updatedAt = Date.now();
+    }
+  });
+}
+
+// Fallback background check on tab creation & update
 if (typeof chrome !== 'undefined' && chrome.tabs) {
   if (chrome.tabs.onCreated) {
     chrome.tabs.onCreated.addListener((tab) => {
       const targetUrl = tab.pendingUrl || tab.url || '';
-      if (tab.id && targetUrl) {
-        checkAndCloseSuspiciousTab(tab.id, targetUrl, tab.openerTabId);
+      if (tab.id && targetUrl && isSuspiciousUrl(targetUrl)) {
+        chrome.tabs.remove(tab.id).catch(() => {});
+        sessionStats.redirectsBlocked++;
+        sessionStats.updatedAt = Date.now();
       }
     });
   }
@@ -164,8 +169,10 @@ if (typeof chrome !== 'undefined' && chrome.tabs) {
   if (chrome.tabs.onUpdated) {
     chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       const targetUrl = changeInfo.url || tab.pendingUrl || tab.url || '';
-      if (tabId && targetUrl) {
-        checkAndCloseSuspiciousTab(tabId, targetUrl, tab.openerTabId);
+      if (tabId && targetUrl && isSuspiciousUrl(targetUrl)) {
+        chrome.tabs.remove(tabId).catch(() => {});
+        sessionStats.redirectsBlocked++;
+        sessionStats.updatedAt = Date.now();
       }
     });
   }
