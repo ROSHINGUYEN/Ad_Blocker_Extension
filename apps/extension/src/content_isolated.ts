@@ -59,11 +59,8 @@ const INLINE_SHIELD_CSS = `
   a[href*="utm_medium"], a[href*="utm_campaign"],
   iframe[src*="adx"], iframe[src*="catfish"], iframe[src*="banner"],
   iframe[src*="popads"], iframe[src*="clickadu"],
-  /* YouTube in-stream ad overlays — ẩn toàn bộ UI quảng cáo khi đang phát */
-  .ytp-ad-overlay-container,
+  /* YouTube in-stream ad overlays — ẩn toàn bộ banner và viền quảng cáo (KHÔNG ẩn nút skip) */
   .ytp-ad-message-container,
-  .ytp-ad-player-overlay,
-  .ytp-ad-player-overlay-instream-info,
   .ytp-ad-text-overlay,
   .ytp-ad-progress,
   .ytp-ad-progress-list,
@@ -73,8 +70,6 @@ const INLINE_SHIELD_CSS = `
   .ytp-ad-preview-text-container,
   .ytp-ad-visit-advertiser-button,
   .ytp-ce-element,
-  #movie_player.ad-showing .ytp-chrome-bottom,
-  #movie_player.ad-showing .ytp-gradient-bottom,
   ytd-ad-slot-renderer,
   #player-ads,
   ytd-banner-promo-renderer,

@@ -34,12 +34,13 @@
   }
 
   // --------------------------------------------------------------------------
-  // YOUTUBE AD HUNTER — Mute + Skip-only (NO currentTime / playbackRate hack)
-  // Lý do: YouTube SSAI phát hiện currentTime/playbackRate => màn hình đen
+  // YOUTUBE AD HUNTER — Instant Skip & 16x/End Acceleration
   // --------------------------------------------------------------------------
   const YOUTUBE_AD_INDICATORS = [
     '.ad-showing',
     '.ad-interrupting',
+    '.ytp-ad-player-overlay',
+    '.ytp-ad-player-overlay-instream-info',
     'ytd-ad-slot-renderer',
     'ytd-player-legacy-desktop-watch-ads-renderer',
   ];
@@ -51,8 +52,10 @@
     '.ytp-ad-skip-button-slot button',
     'button.ytp-ad-skip-button-text',
     '.ytp-ad-skip-button-container button',
+    '.ytp-ad-skip-button-container',
     '.videoAdUiSkipButton',
     'button[id*="skip"]',
+    '.ytp-ad-skip-ad-button',
   ];
 
   function detectYouTubeAd(): boolean {
@@ -81,37 +84,46 @@
     const isAdActive = detectYouTubeAd();
 
     if (isAdActive) {
-      // 1. Tắt tiếng + tua 16x (5s ad → kết thúc trong ~0.3s)
-      // KHÔNG dùng currentTime = duration → gây SSAI black screen
-      // playbackRate = 16 là an toàn, không trigger SSAI detection
+      // 1. Tắt tiếng tức thì 0ms
       if (!adMuted) {
         video.muted = true;
         video.volume = 0;
         adMuted = true;
       }
+
+      // 2. Tua cực nhanh 16x để hết ad ngay
       video.playbackRate = 16.0;
 
-      // 2. Gọi skipAd() API nếu player hỗ trợ (skippable ads)
+      // Nhảy thời gian an toàn nếu duration hợp lệ (bỏ qua đoạn video quảng cáo)
+      if (video.duration && isFinite(video.duration) && video.duration > 0) {
+        if (video.currentTime < video.duration - 0.1) {
+          video.currentTime = video.duration - 0.05;
+        }
+      }
+
+      // 3. Tận dụng Player Internal APIs
       try {
         if (typeof player.skipAd === 'function') player.skipAd();
+        if (typeof player.cancelPlayback === 'function') player.cancelPlayback();
       } catch {}
 
-      // 3. Click tất cả nút Skip có thể xuất hiện
+      // 4. Click liên tục tất cả các dạng nút Skip Ad
       for (const sel of YOUTUBE_SKIP_BUTTONS) {
-        document.querySelectorAll<HTMLElement>(sel).forEach((btn) => {
+        const btns = document.querySelectorAll<HTMLElement>(sel);
+        btns.forEach((btn) => {
           dispatchClick(btn);
         });
       }
 
-      // 4. Quét text "Bỏ qua" / "Skip"
-      document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button').forEach((btn) => {
+      // 5. Quét tất cả button trong .ytp-ad-module & click nếu có text Skip / Bỏ qua
+      document.querySelectorAll<HTMLElement>('.ytp-ad-module button, .video-ads button, .ytp-ad-text').forEach((btn) => {
         const txt = (btn.textContent || '').trim().toLowerCase();
-        if (txt.includes('bỏ qua') || txt.includes('skip')) {
+        if (txt.includes('bỏ qua') || txt.includes('skip') || txt === 'skip ad') {
           dispatchClick(btn);
         }
       });
     } else {
-      // Quảng cáo kết thúc — bật âm thanh + khôi phục tốc độ
+      // Quảng cáo kết thúc — phục hồi âm thanh & tốc độ 1.0x
       if (adMuted) {
         video.muted = false;
         video.volume = 1;
@@ -123,8 +135,8 @@
     }
   }
 
-  // Interval 200ms — đủ nhanh, không quá aggressive để tránh SSAI detect
-  setInterval(handleYouTubeAdState, 200);
+  // Tăng tần suất quét lên 50ms để bắt nút skip và tua ngay không độ trễ
+  setInterval(handleYouTubeAdState, 50);
 
   // MutationObserver chỉ theo dõi class thay đổi trên #movie_player (nhẹ hơn, đủ để bắt ad-showing)
   function setupAdObserver() {
