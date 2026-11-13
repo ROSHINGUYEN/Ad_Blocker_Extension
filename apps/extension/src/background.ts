@@ -3,6 +3,8 @@ import { ShioriIntelligenceEngine } from '@shiori/intelligence-engine';
 import { RedirectGuard } from '@shiori/redirect-guard';
 import { ProtectionStatistics } from '@shiori/shared';
 
+import { closeZombieAndEmptyTabs } from './tab_cleaner';
+
 // Initialize background engines
 export const ruleEngine = new ShioriRuleEngine();
 export const intelligenceEngine = new ShioriIntelligenceEngine();
@@ -80,8 +82,8 @@ export function handleExtensionMessage(
       break;
 
     case 'CLEAN_MEMORY_NOW': {
-      discardIdleTabs().then((discardedCount) => {
-        sendResponse({ success: true, count: discardedCount });
+      Promise.all([discardIdleTabs(), closeZombieAndEmptyTabs()]).then(([discardedCount, closedCount]) => {
+        sendResponse({ success: true, count: discardedCount, closed: closedCount });
       });
       return true;
     }
