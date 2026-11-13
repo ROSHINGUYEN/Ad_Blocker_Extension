@@ -199,8 +199,30 @@
     }
   }
 
-  // Fast polling loop every 50ms so ad finishes in <0.1s
-  setInterval(handleYouTubeAdState, 50);
+  // Fast continuous observer & multi-frequency loop
+  const fastInterval = setInterval(handleYouTubeAdState, 25);
+
+  const observer = new MutationObserver(() => {
+    handleYouTubeAdState();
+  });
+  
+  if (document.documentElement) {
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'src']
+    });
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'src']
+      });
+    });
+  }
 
   document.addEventListener('play', (e) => {
     if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
