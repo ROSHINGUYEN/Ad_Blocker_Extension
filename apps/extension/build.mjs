@@ -19,10 +19,20 @@ async function bundleExtension() {
     sourcemap: true,
   });
 
-  // 2. Bundle Content Script (IIFE for safe isolated context)
+  // 2. Bundle Content Scripts
   await build({
-    entryPoints: [resolve(__dirname, 'src/content.ts')],
-    outfile: resolve(__dirname, 'dist/content.js'),
+    entryPoints: [resolve(__dirname, 'src/content_isolated.ts')],
+    outfile: resolve(__dirname, 'dist/content_isolated.js'),
+    bundle: true,
+    format: 'iife',
+    target: 'es2022',
+    minify: false,
+    sourcemap: true,
+  });
+
+  await build({
+    entryPoints: [resolve(__dirname, 'src/content_main.ts')],
+    outfile: resolve(__dirname, 'dist/content_main.js'),
     bundle: true,
     format: 'iife',
     target: 'es2022',

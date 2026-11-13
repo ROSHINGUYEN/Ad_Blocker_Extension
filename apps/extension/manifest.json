@@ -6,12 +6,23 @@
   "permissions": [
     "storage",
     "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "webNavigation",
     "tabs",
     "scripting"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules/rules.json"
+      }
+    ]
+  },
   "background": {
     "service_worker": "dist/background.js",
     "type": "module"
@@ -19,7 +30,12 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["dist/content.js"],
+      "js": ["dist/content_isolated.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content_main.js"],
       "run_at": "document_start",
       "world": "MAIN"
     }

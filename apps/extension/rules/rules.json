@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||haywin.",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||uk88.",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||hitclub.",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 4,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||win79.",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 5,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||sunwin.",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 6,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||popads.net",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 7,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||clickadu.com",
+      "resourceTypes": ["main_frame", "sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 8,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*catfish*",
+      "resourceTypes": ["sub_frame", "script", "image", "xmlhttprequest"]
+    }
+  }
+]
