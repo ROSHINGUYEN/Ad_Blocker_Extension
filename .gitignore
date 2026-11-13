@@ -38,3 +38,4 @@ Cargo.lock
 # Packaged extensions
 *.crx
 *.pem
+_metadata/
