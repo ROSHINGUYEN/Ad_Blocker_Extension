@@ -12,6 +12,87 @@
     }
   });
 
+  // -------------------------------------------------------------
+  // 0. DEEP YOUTUBE AD DATA NEUTRALIZATION (Clean player response at source)
+  // -------------------------------------------------------------
+  function cleanYouTubePlayerObject(obj: any): any {
+    if (!obj || typeof obj !== 'object') return obj;
+    try {
+      if (obj.adPlacements) delete obj.adPlacements;
+      if (obj.playerAds) delete obj.playerAds;
+      if (obj.adSlots) delete obj.adSlots;
+      if (obj.adBreakHeartbeatParams) delete obj.adBreakHeartbeatParams;
+    } catch {}
+    return obj;
+  }
+
+  // Intercept window.ytInitialPlayerResponse if defined
+  try {
+    let internalPlayerResponse = (window as any).ytInitialPlayerResponse;
+    Object.defineProperty(window, 'ytInitialPlayerResponse', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return internalPlayerResponse;
+      },
+      set(val) {
+        internalPlayerResponse = cleanYouTubePlayerObject(val);
+      }
+    });
+    if (internalPlayerResponse) {
+      cleanYouTubePlayerObject(internalPlayerResponse);
+    }
+  } catch {}
+
+  // Intercept fetch API for YouTube Player calls
+  try {
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args: any[]) {
+      const response = await originalFetch.apply(this, args as any);
+      const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+      if (url.includes('/youtubei/v1/player')) {
+        try {
+          const clone = response.clone();
+          const json = await clone.json();
+          cleanYouTubePlayerObject(json);
+          return new Response(JSON.stringify(json), {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+          });
+        } catch {
+          return response;
+        }
+      }
+      return response;
+    };
+  } catch {}
+
+  // Intercept XMLHttpRequest for YouTube Player calls
+  try {
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...rest: any[]) {
+      (this as any)._requestUrl = String(url);
+      return originalOpen.apply(this, [method, url, ...rest] as any);
+    };
+    XMLHttpRequest.prototype.send = function(body?: Document | XMLHttpRequestBodyInit | null) {
+      if ((this as any)._requestUrl?.includes('/youtubei/v1/player')) {
+        this.addEventListener('readystatechange', () => {
+          if (this.readyState === 4 && this.status === 200) {
+            try {
+              const data = JSON.parse(this.responseText);
+              cleanYouTubePlayerObject(data);
+              Object.defineProperty(this, 'responseText', { value: JSON.stringify(data) });
+              Object.defineProperty(this, 'response', { value: JSON.stringify(data) });
+            } catch {}
+          }
+        });
+      }
+      return originalSend.apply(this, [body] as any);
+    };
+  } catch {}
+
   // 1. Synthetic mouse event dispatcher targeting element center
   function dispatchClick(el: HTMLElement) {
     try {

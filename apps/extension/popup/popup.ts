@@ -101,14 +101,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const ramBtn = document.getElementById('btn-ram');
   if (ramBtn) {
     ramBtn.addEventListener('click', () => {
-      ramBtn.textContent = '⏳ Đang dọn...';
+      ramBtn.textContent = '⏳ Đang tối ưu...';
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'CLEAN_MEMORY_NOW' }, (res) => {
+        chrome.runtime.sendMessage({ type: 'CLEAN_MEMORY_NOW' }, (memRes) => {
           chrome.runtime.sendMessage({ type: 'CLEAR_CACHE_NOW' }, () => {
-            ramBtn.textContent = `⚡ Đã dọn ${res?.count || 0} tab!`;
+            const tabsDiscarded = memRes?.count || 0;
+            const tabsClosed = memRes?.closed || 0;
+            if (tabsDiscarded > 0 || tabsClosed > 0) {
+              ramBtn.textContent = `⚡ Đã giải phóng ${tabsDiscarded + tabsClosed} tab!`;
+            } else {
+              ramBtn.textContent = '⚡ Đã dọn sạch đệm RAM & Cache!';
+            }
             setTimeout(() => {
               ramBtn.textContent = '⚡ Tối ưu RAM';
-            }, 2000);
+            }, 2500);
           });
         });
       }

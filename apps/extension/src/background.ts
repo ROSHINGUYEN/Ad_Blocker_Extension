@@ -90,9 +90,19 @@ export function handleExtensionMessage(
 
     case 'CLEAR_CACHE_NOW': {
       if (typeof chrome !== 'undefined' && chrome.browsingData) {
-        chrome.browsingData.removeCache({}, () => {
-          sendResponse({ success: true });
-        });
+        // Deep clean: cache, cacheStorage, fileSystems, serviceWorkers
+        chrome.browsingData.remove(
+          {},
+          {
+            cache: true,
+            cacheStorage: true,
+            fileSystems: true,
+            serviceWorkers: true,
+          },
+          () => {
+            sendResponse({ success: true });
+          }
+        );
         return true;
       }
       sendResponse({ success: false });

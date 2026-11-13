@@ -34,3 +34,7 @@ Cargo.lock
 # Cache
 .cache/
 .vitest/
+
+# Packaged extensions
+*.crx
+*.pem

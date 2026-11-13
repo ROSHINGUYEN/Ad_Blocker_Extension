@@ -85,14 +85,20 @@
     const ramBtn = document.getElementById("btn-ram");
     if (ramBtn) {
       ramBtn.addEventListener("click", () => {
-        ramBtn.textContent = "\u23F3 \u0110ang d\u1ECDn...";
+        ramBtn.textContent = "\u23F3 \u0110ang t\u1ED1i \u01B0u...";
         if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-          chrome.runtime.sendMessage({ type: "CLEAN_MEMORY_NOW" }, (res) => {
+          chrome.runtime.sendMessage({ type: "CLEAN_MEMORY_NOW" }, (memRes) => {
             chrome.runtime.sendMessage({ type: "CLEAR_CACHE_NOW" }, () => {
-              ramBtn.textContent = `\u26A1 \u0110\xE3 d\u1ECDn ${res?.count || 0} tab!`;
+              const tabsDiscarded = memRes?.count || 0;
+              const tabsClosed = memRes?.closed || 0;
+              if (tabsDiscarded > 0 || tabsClosed > 0) {
+                ramBtn.textContent = `\u26A1 \u0110\xE3 gi\u1EA3i ph\xF3ng ${tabsDiscarded + tabsClosed} tab!`;
+              } else {
+                ramBtn.textContent = "\u26A1 \u0110\xE3 d\u1ECDn s\u1EA1ch \u0111\u1EC7m RAM & Cache!";
+              }
               setTimeout(() => {
                 ramBtn.textContent = "\u26A1 T\u1ED1i \u01B0u RAM";
-              }, 2e3);
+              }, 2500);
             });
           });
         }
