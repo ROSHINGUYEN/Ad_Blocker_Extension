@@ -12,33 +12,26 @@
     }
   });
 
-  // 1. Synthetic mouse event dispatcher targeting element center
-  function dispatchSyntheticClick(el: HTMLElement) {
-    const rect = el.getBoundingClientRect();
-    const clientX = rect.left + rect.width / 2;
-    const clientY = rect.top + rect.height / 2;
-    const opts = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view: window,
-      clientX,
-      clientY,
-    };
-
-    el.dispatchEvent(new PointerEvent('pointerdown', opts));
-    el.dispatchEvent(new MouseEvent('mousedown', opts));
-    el.dispatchEvent(new PointerEvent('pointerup', opts));
-    el.dispatchEvent(new MouseEvent('mouseup', opts));
-    el.dispatchEvent(new MouseEvent('click', opts));
+  // 1. YouTube Auto-Skip Engine
+  function dispatchClick(el: HTMLElement) {
     try {
+      const rect = el.getBoundingClientRect();
+      const opts = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      };
+      el.dispatchEvent(new PointerEvent('pointerdown', opts));
+      el.dispatchEvent(new MouseEvent('mousedown', opts));
+      el.dispatchEvent(new PointerEvent('pointerup', opts));
+      el.dispatchEvent(new MouseEvent('mouseup', opts));
+      el.dispatchEvent(new MouseEvent('click', opts));
       el.click();
     } catch {}
   }
-
-  let handlingAd = false;
-  let originalPlaybackRate = 1.0;
-  let originalMuted = false;
 
   function handleYouTubeAdState() {
     if (!isExtensionEnabled) return;
@@ -48,108 +41,60 @@
     const video = document.querySelector('video') as HTMLVideoElement | null;
     if (!player || !video) return;
 
-    // Detect YouTube Ad State (class on player OR ad badges OR overlay text/container)
-    const isAdPlaying =
+    // CHECK CHÍNH XÁC 100%: Chỉ can thiệp khi YouTube có class ad-showing hoặc ad-interrupting
+    const isRealAdPlaying =
       player.classList?.contains('ad-showing') ||
-      player.classList?.contains('ad-interrupting') ||
-      Boolean(document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .video-ads, .ytp-ad-module, ytd-ad-slot-renderer, .ytp-ad-badge, [class*="ytp-ad-"], [class*="skip-button"]'));
+      player.classList?.contains('ad-interrupting');
 
-    if (isAdPlaying) {
-      if (!handlingAd) {
-        handlingAd = true;
-        originalPlaybackRate = video.playbackRate > 2.0 ? 1.0 : (video.playbackRate || 1.0);
-        originalMuted = video.muted;
-      }
-
-      // 1. Mute ad instantly
+    if (isRealAdPlaying) {
+      // 1. Tắt tiếng ad để không làm phiền người dùng
       video.muted = true;
 
-      // 2. Fast-forward ad at 16x speed
-      video.playbackRate = 16.0;
-
-      // 3. Jump to end of ad clip immediately
-      if (video.duration && isFinite(video.duration)) {
-        if (video.duration <= 120 && video.currentTime < video.duration) {
-          video.currentTime = video.duration;
-        }
-      }
-
-      // 4. Force trigger internal player skip API
+      // 2. Click nút Skip Ad ngay lập tức (KHÔNG TUA VIDEO BẰNG PLAYBACKRATE HOẶC CURRENTTIME NỮA ĐỂ TRÁNH LỖI)
       try {
         if (typeof player.skipAd === 'function') {
           player.skipAd();
         }
       } catch {}
 
-      // 5. Aggressive click on ALL known YouTube skip ad selectors (including buttons, spans, divs)
       const skipSelectors = [
-        '.ytp-ad-skip-button',
         '.ytp-ad-skip-button-modern',
-        'button.ytp-ad-skip-button-text',
         '.ytp-skip-ad-button',
+        '.ytp-ad-skip-button',
         '.ytp-ad-skip-button-slot button',
-        'button[id*="skip"]',
-        '.videoAdUiSkipButton',
-        '[class*="skip-button"]',
+        'button.ytp-ad-skip-button-text',
         '.ytp-ad-skip-button-container button',
-        '.ytp-ad-skip-button-container',
-        'div[class*="ytp-ad-skip-button"]',
-        'button.ytp-ad-text'
+        '.videoAdUiSkipButton',
+        '[class*="skip-button"]'
       ];
 
       for (const sel of skipSelectors) {
-        const elements = document.querySelectorAll<HTMLElement>(sel);
-        elements.forEach((el) => {
-          dispatchSyntheticClick(el);
+        const btns = document.querySelectorAll<HTMLElement>(sel);
+        btns.forEach((btn) => {
+          dispatchClick(btn);
         });
       }
 
-      // Also click anything with text "Bỏ qua" or "Skip"
-      const allButtons = document.querySelectorAll<HTMLElement>('button, div[role="button"]');
+      // Quét thêm bất kỳ button nào có chữ "Bỏ qua" hoặc "Skip"
+      const allButtons = document.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text');
       allButtons.forEach((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
         if (txt.includes('bỏ qua') || txt.includes('skip')) {
-          dispatchSyntheticClick(btn);
+          dispatchClick(btn);
         }
       });
-
-      // 6. Force clear ad overlay class from player if stuck
-      if (video.currentTime >= (video.duration - 0.2)) {
-        try {
-          player.classList?.remove('ad-showing');
-          player.classList?.remove('ad-interrupting');
-          if (typeof player.playVideo === 'function') {
-            player.playVideo();
-          }
-        } catch {}
-      }
     } else {
-      // Restore normal playback for the main video
-      if (handlingAd) {
-        handlingAd = false;
-        video.muted = originalMuted;
-        video.playbackRate = originalPlaybackRate;
+      // TUYỆT ĐỐI KHÔNG CAN THIỆP KHI VIDEO CHÍNH ĐANG PHÁT: Giữ nguyên tốc độ chuẩn của người dùng
+      if (video.playbackRate > 2.0) {
+        video.playbackRate = 1.0;
       }
     }
   }
 
-  // High-frequency polling loop: checks every 50ms
-  setInterval(handleYouTubeAdState, 50);
-
-  document.addEventListener('play', (e) => {
-    if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
-      handleYouTubeAdState();
-    }
-  }, true);
-
-  document.addEventListener('timeupdate', (e) => {
-    if ((e.target as HTMLElement)?.tagName === 'VIDEO') {
-      handleYouTubeAdState();
-    }
-  }, true);
+  // Quét định kỳ 100ms
+  setInterval(handleYouTubeAdState, 100);
 
   window.addEventListener('yt-navigate-finish', () => {
-    handlingAd = false;
     handleYouTubeAdState();
   }, true);
 
