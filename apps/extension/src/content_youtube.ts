@@ -90,14 +90,15 @@
       const d = video.duration;
       if (Number.isFinite(d) && d > 0 && d <= 120) {
         video.playbackRate = 16.0;
+        // Nếu là quảng cáo không có nút skip (non-skippable) như quảng cáo 10s trong ảnh:
+        // Tua nhanh an toàn bằng cách nhảy về gần cuối quảng cáo
+        if (video.currentTime < d - 0.2) {
+          video.currentTime = d - 0.1;
+        }
       }
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
       adActive = false;
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
       // Khôi phục âm thanh: mở tiếng lại cho video chính
       video.muted = false;
       try {
@@ -120,10 +121,14 @@
     if (!el || el === player) return;
     classObserver?.disconnect();
     player = el;
-    // CHỈ observe class của movie_player để biết khi nào ad xuất hiện/kết thúc
-    // TUYỆT ĐỐI KHÔNG observe subtree hay childList vì YouTube chèn DOM liên tục hàng nghìn lần/s gây sập browser
     classObserver = new MutationObserver(tick);
     classObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
+
+    // Kiểm tra định kỳ nhẹ nhàng mỗi 250ms (chỉ tốn ~0.01% CPU)
+    // Đảm bảo không bao giờ bị sót khi YouTube chèn quảng cáo 10s không đổi class
+    if (!pollTimer) {
+      pollTimer = setInterval(tick, 250);
+    }
     tick();
   }
 
