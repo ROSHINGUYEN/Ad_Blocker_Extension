@@ -1,132 +1,127 @@
 /**
- * Content script (MAIN world, CHỈ youtube.com): Tự động nhận diện và bỏ qua quảng cáo in-stream.
+ * Content script (MAIN world, CHỈ youtube.com): bỏ qua quảng cáo in-stream.
  *
- * TIÊU CHÍ SIÊU NHẸ (0% CPU, KHÔNG BAO GIỜ TREO TRANG):
- *  - Tuyệt đối KHÔNG DÙNG setInterval (chống crash tab và loop vô hạn).
- *  - Tuyệt đối KHÔNG DÙNG video.currentTime (chống vỡ buffer MediaSource).
- *  - Tự động bỏ qua quảng cáo bằng: speed 16x + player.skipAd() + click nút Skip.
- *  - Dùng RAF (requestAnimationFrame) khi có quảng cáo để theo dõi êm ái theo chu kỳ render của màn hình.
+ * Tiêu chí an toàn tuyệt đối:
+ *  - CHỈ can thiệp khi container `#movie_player` thực sự chứa class `ad-showing` hoặc `ad-interrupting`.
+ *  - KHÔNG bắt nhầm `ytd-ad-slot-renderer` (banner tĩnh ở sidebar/comments) để tránh tua nhầm hoặc tắt tiếng video chính.
+ *  - KHÔNG can thiệp parse/patch JSON của window.fetch / ytInitialPlayerResponse để tránh trigger hệ thống Anti-Adblock của YouTube.
+ *  - Khi quảng cáo kết thúc: LẬP TỨC khôi phục âm thanh (`muted`) và tốc độ (`playbackRate`) gốc của người dùng.
  */
 (() => {
+  const AD_CLASSES = ['ad-showing', 'ad-interrupting'];
   const SKIP_SELECTOR =
     '.ytp-skip-ad-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button, .ytp-ad-skip-button-slot button, button.ytp-ad-skip-button-text, .ytp-ad-skip-button-container button, .videoAdUiSkipButton';
 
   function dispatchSyntheticClick(el: HTMLElement): void {
     try {
+      const rect = el.getBoundingClientRect();
+      const opts: MouseEventInit = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      };
+      el.dispatchEvent(new PointerEvent('pointerdown', opts));
+      el.dispatchEvent(new MouseEvent('mousedown', opts));
+      el.dispatchEvent(new PointerEvent('pointerup', opts));
+      el.dispatchEvent(new MouseEvent('mouseup', opts));
+      el.dispatchEvent(new MouseEvent('click', opts));
       el.click();
     } catch {}
   }
 
   let player: HTMLElement | null = null;
+  let classObserver: MutationObserver | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
   let adActive = false;
-  let rafId: number | null = null;
+  let savedMuted = false;
+  let savedRate = 1;
 
-  function isAdShowing(): boolean {
+  // STRICT DETECTION 100%: CHỈ KHI CONTAINER MOVIE_PLAYER THỰC SỰ CÓ CLASS AD-SHOWING / AD-INTERRUPTING
+  const isAdShowing = (): boolean => {
     if (!player) return false;
-    if (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')) {
-      return true;
-    }
-    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .ytp-ad-duration-remaining')) {
-      return true;
-    }
-    return false;
-  }
+    return player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting');
+  };
 
-  function adLoop(): void {
-    if (!player) return;
-    const video = player.querySelector<HTMLVideoElement>('video');
-    
+  function tick(): void {
+    if (!player?.isConnected) return;
+    const video = player.querySelector<HTMLVideoElement>('video.html5-main-video, video');
+    if (!video) return;
+
     if (isAdShowing()) {
       if (!adActive) {
         adActive = true;
-        console.log('[Shiori YT Debug] 🎯 Phát hiện quảng cáo! Kích hoạt chế độ tắt tiếng và tăng tốc 16x.');
-        // Báo về background để hiển thị lên popup thống kê
-        try {
-          window.postMessage({ source: 'shiori-main', type: 'SHIORI_CLICK_BLOCKED' }, '*');
-        } catch {}
-      }
-      if (video) {
-        video.muted = true;
-        if (video.playbackRate < 16.0) {
-          video.playbackRate = 16.0;
-        }
+        savedMuted = video.muted;
+        savedRate = video.playbackRate || 1;
+        pollTimer ??= setInterval(tick, 100);
       }
 
-      // Skip API
+      // 1. Tắt tiếng quảng cáo 0ms
+      video.muted = true;
+
+      // 2. Tự động click các loại nút Skip Ad
       try {
         const p = player as any;
-        if (typeof p.skipAd === 'function') {
-          p.skipAd();
-          console.log('[Shiori YT Debug] ⏩ Đã gọi player.skipAd()');
-        }
+        if (typeof p.skipAd === 'function') p.skipAd();
       } catch {}
 
-      // Click Skip Buttons
-      player.querySelectorAll<HTMLElement>(SKIP_SELECTOR).forEach((btn) => {
-        console.log('[Shiori YT Debug] 👆 Click nút Skip Ad');
+      const skipButtons = player.querySelectorAll<HTMLElement>(SKIP_SELECTOR);
+      skipButtons.forEach((btn) => {
         dispatchSyntheticClick(btn);
       });
-      player.querySelectorAll<HTMLElement>('.video-ads button, button.ytp-ad-skip-button').forEach((btn) => {
+
+      player.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text, button.ytp-ad-skip-button').forEach((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
         if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
-          console.log('[Shiori YT Debug] 👆 Click nút Bỏ qua văn bản');
           dispatchSyntheticClick(btn);
         }
       });
 
-      // Lặp lại theo frame kế tiếp (rất mượt, không bao giờ ngốn CPU)
-      rafId = requestAnimationFrame(adLoop);
-    } else {
-      // Hết quảng cáo: DỪNG NGAY VÒNG LẶP
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-      if (adActive) {
-        adActive = false;
-        console.log('[Shiori YT Debug] ✅ Quảng cáo đã hết. Phục hồi âm thanh và tốc độ 1.0x.');
-        if (video) {
-          video.muted = false;
-          try {
-            const p = player as any;
-            if (typeof p.unMute === 'function') p.unMute();
-          } catch {}
-          video.playbackRate = 1.0;
-        }
-      }
-    }
-  }
-
-  function onStateChange(): void {
-    if (isAdShowing()) {
-      if (rafId === null) {
-        rafId = requestAnimationFrame(adLoop);
+      // 3. Tua tốc độ: CHỈ tua khi video thực sự là quảng cáo ngắn (thời lượng <= 120s)
+      const d = video.duration;
+      if (Number.isFinite(d) && d > 0 && d <= 120) {
+        video.playbackRate = 16.0;
       }
     } else if (adActive) {
-      adLoop();
+      // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
+      adActive = false;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      video.muted = savedMuted;
+      if (video.volume === 0) video.volume = 1;
+      video.playbackRate = savedRate;
+      try {
+        const p = player as any;
+        if (typeof p.unMute === 'function') p.unMute();
+      } catch {}
     }
   }
 
   function bindPlayer(): void {
     const el = document.getElementById('movie_player');
     if (!el || el === player) return;
+    classObserver?.disconnect();
     player = el;
+    classObserver = new MutationObserver(tick);
+    classObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
+    tick();
+  }
 
-    // Lắng nghe thay đổi class của movie_player
-    const obs = new MutationObserver(() => {
-      onStateChange();
+  // Chờ player xuất hiện (document_start): gộp bằng rAF
+  let scheduled = false;
+  new MutationObserver(() => {
+    if (scheduled || player?.isConnected) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      bindPlayer();
     });
-    obs.observe(el, { attributes: true, attributeFilter: ['class'] });
-
-    onStateChange();
-  }
-
-  // Khởi tạo an toàn
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindPlayer, { once: true });
-  } else {
-    bindPlayer();
-  }
+  }).observe(document.documentElement, { childList: true, subtree: true });
 
   window.addEventListener('yt-navigate-finish', bindPlayer, true);
+  bindPlayer();
 })();
