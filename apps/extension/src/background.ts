@@ -2,8 +2,6 @@ import { ShioriRuleEngine } from '@shiori/rules-engine';
 import { isBlockedUrl } from '@shiori/shared';
 import type { ProtectionStatistics } from '@shiori/shared';
 
-import { closeZombieAndEmptyTabs } from './tab_cleaner';
-
 /* -------------------------------------------------------------------------- */
 /* Rule engine (chỉ dùng cho cosmetic CSS; chặn mạng do declarativeNetRequest) */
 /* -------------------------------------------------------------------------- */
@@ -170,43 +168,15 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Tối ưu RAM: chỉ discard tab an toàn                                         */
-/* -------------------------------------------------------------------------- */
-async function discardIdleTabs(): Promise<number> {
-  try {
-    const tabs = await chrome.tabs.query({
-      active: false,
-      audible: false,
-      discarded: false,
-      autoDiscardable: true,
-      windowType: 'normal',
-    });
-    const targets = tabs.filter((t) => t.id !== undefined && !t.pinned && /^https?:/i.test(t.url ?? ''));
-    const results = await Promise.allSettled(targets.map((t) => chrome.tabs.discard(t.id!)));
-    return results.filter((r) => r.status === 'fulfilled').length;
-  } catch {
-    return 0;
-  }
-}
-
-async function clearHttpCache(): Promise<void> {
-  // CHỈ xoá cache HTTP. Bản cũ còn xoá cacheStorage/serviceWorkers/fileSystems của MỌI trang
-  // -> làm hỏng PWA, mất dữ liệu offline mà người dùng không hề được hỏi.
-  await chrome.browsingData.removeCache({ since: 0 });
-}
-
-/* -------------------------------------------------------------------------- */
 /* Message router (có kiểm tra nguồn gửi)                                      */
 /* -------------------------------------------------------------------------- */
 type Msg =
   | { type: 'GET_STATS' }
-  | { type: 'CLEAN_MEMORY_NOW' }
-  | { type: 'CLEAR_CACHE_NOW' }
   | { type: 'INCREMENT_DOM_HIDDEN'; payload?: { count?: number } }
   | { type: 'INCREMENT_REDIRECT_BLOCKED'; payload?: { count?: number } }
   | { type: 'GET_COSMETIC_CSS'; payload?: { hostname?: string } };
 
-const POPUP_ONLY = new Set(['GET_STATS', 'CLEAN_MEMORY_NOW', 'CLEAR_CACHE_NOW']);
+const POPUP_ONLY = new Set(['GET_STATS']);
 const CONTENT_ONLY = new Set(['INCREMENT_DOM_HIDDEN', 'INCREMENT_REDIRECT_BLOCKED', 'GET_COSMETIC_CSS']);
 
 function clampCount(n: unknown): number {
@@ -237,19 +207,6 @@ export function handleExtensionMessage(
 
     case 'INCREMENT_REDIRECT_BLOCKED':
       return respondAsync(bump('redirectsBlocked', clampCount(message.payload?.count)).then(() => ({ success: true })), sendResponse);
-
-    case 'CLEAN_MEMORY_NOW':
-      return respondAsync(
-        Promise.all([discardIdleTabs(), closeZombieAndEmptyTabs()]).then(([discarded, closed]) => ({
-          success: true,
-          count: discarded,
-          closed,
-        })),
-        sendResponse
-      );
-
-    case 'CLEAR_CACHE_NOW':
-      return respondAsync(clearHttpCache().then(() => ({ success: true })), sendResponse);
 
     case 'GET_COSMETIC_CSS': {
       const host = String(message.payload?.hostname ?? '').slice(0, 253);
