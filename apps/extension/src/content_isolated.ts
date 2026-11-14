@@ -19,10 +19,12 @@ const SHIELD_SELECTORS: string[] = [
   '[class*="ads-holder"]', '[id*="ads-holder"]',
   '[class*="banner-ads"]', '[id*="banner-ads"]',
   '[class*="adv-"]', '[class*="-adv"]',
+  'div[class*="banner"] a', 'div[id*="banner"] a',
   'a[href*="pc-catfish"]', 'a[href*="topbanner"]',
   'a[href*="vsbet"]', 'a[href*="sun88"]', 'a[href*="sunwin"]', 'a[href*="go88"]', 'a[href*="hitclub"]',
+  'img[src*="vsbet"]', 'img[src*="sun88"]', 'img[src*="sunwin"]', 'img[src*="banner"]', 'img[alt*="vsbet"]', 'img[alt*="sun88"]',
   // Link tới domain cờ bạc: neo vào đầu nhãn host để không trúng "sunwind", "logo88"...
-  ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`, `a[href*="/${l}"]`]),
+  ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`, `a[href*="/${l}"]`, `img[src*="${l}"]`]),
   'iframe[src*="popads"]', 'iframe[src*="clickadu"]', 'iframe[src*="ads"]',
   // Quảng cáo YouTube ngoài luồng video & Hộp thoại Anti-Adblock
   '.ytp-ad-message-container',
@@ -37,11 +39,14 @@ let enabled = true;
 let cosmeticCss = '';
 
 function mount(id: string, css: string): void {
-  if (!css || document.getElementById(id)) return;
-  const style = document.createElement('style');
-  style.id = id;
+  if (!css) return;
+  let style = document.getElementById(id) as HTMLStyleElement | null;
+  if (!style) {
+    style = document.createElement('style');
+    style.id = id;
+    (document.head ?? document.documentElement).appendChild(style);
+  }
   style.textContent = css;
-  (document.head ?? document.documentElement).appendChild(style);
 }
 
 function unmount(id: string): void {
