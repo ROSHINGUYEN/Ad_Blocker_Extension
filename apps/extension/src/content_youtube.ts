@@ -39,10 +39,17 @@
   let savedMuted = false;
   let savedRate = 1;
 
-  // STRICT DETECTION: Chỉ coi là quảng cáo khi player chính có class ad-showing/ad-interrupting
+  // STRICT DETECTION V2: Nhận diện chuẩn xác mọi dạng quảng cáo in-stream không bắt nhầm video chính
   const isAdShowing = (): boolean => {
     if (!player) return false;
-    return AD_CLASSES.some((c) => player!.classList.contains(c));
+    // 1. Kiểm tra class trên container player
+    if (AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
+    // 2. Kiểm tra container quảng cáo thực tế bên trong player
+    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-instream-info')) return true;
+    // 3. Kiểm tra nút skip hoặc badge ad đang hiển thị
+    const skipBtn = player.querySelector<HTMLElement>(SKIP_SELECTOR);
+    if (skipBtn && skipBtn.offsetParent !== null) return true;
+    return false;
   };
 
   function tick(): void {

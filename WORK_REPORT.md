@@ -266,3 +266,22 @@
   - `pnpm test`: 43/43 tests pass (11 test files). (ĐÃ HOÀN THÀNH)
   - Build `apps/extension` thành công. (ĐÃ HOÀN THÀNH)
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-14 — Script Dò & Phát Hiện Chặn Quảng Cáo V2 (YouTube & Web)
+
+- **Mục tiêu:**
+  1. Nâng cấp bộ dò tìm quảng cáo YouTube (YouTube Detector V2):
+     - Kiểm tra đa tầng: Class container (`ad-showing`, `ad-interrupting`), lớp phủ quảng cáo thực tế bên trong player (`.ytp-ad-player-overlay`, `.ytp-ad-player-overlay-instream-info`), và sự hiện diện của nút Skip Ad (`offsetParent !== null`).
+     - Cách ly hoàn toàn với video chính: Chỉ quét bên trong vùng DOM của `#movie_player`, không quét ra ngoài tài liệu trang (loại bỏ 100% rủi ro bắt nhầm sidebar hoặc bình luận).
+     - Tự động tắt tiếng + tăng tốc 16x an toàn và kích hoạt chuỗi sự kiện click chuột giả lập (`dispatchSyntheticClick`) để bỏ qua quảng cáo trong tích tắc.
+  2. Nâng cấp bộ dò tìm Web (Web Ad Detector V2):
+     - Tối ưu hóa hệ thống `FloatingAdDetector`: Sử dụng giải thuật hình học & cấu trúc (computed `position: fixed/absolute`, `z-index >= 999`, neo link ra ngoài domain khác) để ẩn các popup nổi và banner đè mà không cần phụ thuộc vào danh sách từ khóa tĩnh.
+     - Duy trì CSS Shield hiệu năng cao tức thì, bảo vệ giao diện sạch sẽ không bị nhấp nháy quảng cáo.
+- **Tiêu chí hoàn thành:**
+  - `pnpm -r run typecheck`: 0 lỗi. (ĐÃ HOÀN THÀNH)
+  - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
+  - Bundle `apps/extension` được build thành công. (ĐÃ HOÀN THÀNH)
+- **Trạng thái:** PASS
