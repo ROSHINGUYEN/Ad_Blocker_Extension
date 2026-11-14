@@ -38,10 +38,14 @@
   let adActive = false;
   let savedRate = 1;
 
-  // STRICT DETECTION 100%: CHỈ KHI CONTAINER MOVIE_PLAYER THỰC SỰ CÓ CLASS AD-SHOWING / AD-INTERRUPTING
+  // STRICT DETECTION:
+  // 1. Container movie_player có class ad-showing hoặc ad-interrupting
+  // 2. HOẶC thanh tiến trình màu vàng/chứa selector hiển thị ad (.ytp-ad-player-overlay, video-ads ytp-ad-module)
   const isAdShowing = (): boolean => {
     if (!player) return false;
-    return AD_CLASSES.some((c) => player!.classList.contains(c));
+    if (AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
+    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .ytp-ad-preview-container, .ytp-ad-duration-remaining')) return true;
+    return false;
   };
 
   function tick(): void {
@@ -90,10 +94,6 @@
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
       adActive = false;
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
       // Khôi phục âm thanh: mở tiếng lại 100% cho video chính
       video.muted = false;
       try {
@@ -130,7 +130,11 @@
     classObserver?.disconnect();
     player = el;
     classObserver = new MutationObserver(tick);
-    classObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
+    classObserver.observe(el, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
+    // Chạy vòng lặp thường trực 100ms để không bao giờ bị lọt frame quảng cáo
+    if (!pollTimer) {
+      pollTimer = setInterval(tick, 100);
+    }
     tick();
   }
 
