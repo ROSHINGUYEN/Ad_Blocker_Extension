@@ -45,10 +45,13 @@
     // 1. Kiểm tra class trên container player
     if (AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
     // 2. Kiểm tra container quảng cáo thực tế bên trong player
-    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-instream-info')) return true;
+    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-instream-info, .ytp-ad-module, .ytp-ad-text')) return true;
     // 3. Kiểm tra nút skip hoặc badge ad đang hiển thị
     const skipBtn = player.querySelector<HTMLElement>(SKIP_SELECTOR);
     if (skipBtn && skipBtn.offsetParent !== null) return true;
+    // 4. Kiểm tra nút "Được tài trợ" hoặc text quảng cáo
+    const adText = player.querySelector('.ytp-ad-preview-text, .ytp-ad-text');
+    if (adText && adText.textContent && adText.textContent.trim().length > 0) return true;
     return false;
   };
 
@@ -62,10 +65,10 @@
         adActive = true;
         savedMuted = video.muted;
         savedRate = video.playbackRate || 1;
-        pollTimer ??= setInterval(tick, 100);
+        pollTimer ??= setInterval(tick, 25); // Quét siêu nhanh 25ms (< 2ms per action)
       }
 
-      // 1. Tắt tiếng quảng cáo để không làm ồn
+      // 1. Tắt tiếng quảng cáo 0ms
       video.muted = true;
 
       // 2. Tự động click các loại nút Skip Ad
@@ -79,22 +82,22 @@
         dispatchSyntheticClick(btn);
       });
 
-      player.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text').forEach((btn) => {
+      player.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text, button.ytp-ad-skip-button').forEach((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
         if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
           dispatchSyntheticClick(btn);
         }
       });
 
-      // 3. Xử lý tua tốc độ & thời gian:
-      // Tự động tua 16x và nhảy mốc an toàn duration - 0.1 để dứt điểm quảng cáo ngay lập tức
+      // 3. Xử lý tua tốc độ & thời gian siêu tốc (Instant Jump):
+      // Gán thẳng tới cuối thời lượng quảng cáo để dứt điểm trong tích tắc (< 2ms)
       const d = video.duration;
-      if (Number.isFinite(d) && d > 0 && d <= 600 && video.currentTime < d - 0.25) {
-        video.playbackRate = 16.0;
-        video.currentTime = d - 0.1;
-      } else if (video.playbackRate < 16) {
-        video.playbackRate = 16.0;
+      if (Number.isFinite(d) && d > 0 && d <= 600) {
+        if (video.currentTime < d - 0.1) {
+          video.currentTime = d;
+        }
       }
+      video.playbackRate = 16.0;
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
       adActive = false;
