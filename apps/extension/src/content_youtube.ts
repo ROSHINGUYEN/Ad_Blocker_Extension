@@ -40,11 +40,16 @@
 
   // STRICT DETECTION:
   // 1. Container movie_player có class ad-showing hoặc ad-interrupting
-  // 2. HOẶC thanh tiến trình màu vàng/chứa selector hiển thị ad (.ytp-ad-player-overlay, video-ads ytp-ad-module)
-  const isAdShowing = (): boolean => {
+  // 2. HOẶC chứa overlay quảng cáo in-stream thực sự
+  // TUYỆT ĐỐI CHỈ COI LÀ QUẢNG CÁO KHI THỜI LƯỢNG VIDEO <= 120 GIÂY
+  // Video dài (như video 1h48m của người dùng) KHÔNG BAO GIỜ bị tính là quảng cáo!
+  const isAdShowing = (video: HTMLVideoElement): boolean => {
     if (!player) return false;
+    const d = video.duration;
+    if (Number.isFinite(d) && d > 120) return false;
+
     if (AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
-    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .ytp-ad-preview-container, .ytp-ad-duration-remaining')) return true;
+    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-preview-container, .ytp-ad-duration-remaining')) return true;
     return false;
   };
 
@@ -53,7 +58,7 @@
     const video = player.querySelector<HTMLVideoElement>('video.html5-main-video, video');
     if (!video) return;
 
-    if (isAdShowing()) {
+    if (isAdShowing(video)) {
       if (!adActive) {
         adActive = true;
         savedRate = video.playbackRate || 1;
@@ -82,17 +87,12 @@
       });
 
       // 3. Tua tốc độ: CHỈ tua khi video thực sự là quảng cáo ngắn (thời lượng <= 120s)
-      // KHÔNG BAO GIỜ tua nếu thời lượng > 120s (để bảo vệ 100% video chính của người dùng không bao giờ bị tua nhầm)
       const d = video.duration;
       if (Number.isFinite(d) && d > 0 && d <= 120) {
         video.playbackRate = 16.0;
-        // Nếu quảng cáo sắp hết hoặc đang chạy: gọi play() liên tục để không bị kẹt spinner loading
-        if (video.paused) {
-          try { video.play(); } catch {}
-        }
       }
     } else if (adActive) {
-      // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
+      // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
       adActive = false;
       // Khôi phục âm thanh: mở tiếng lại cho video chính
       video.muted = false;
@@ -101,15 +101,6 @@
         if (typeof p.unMute === 'function') p.unMute();
       } catch {}
       video.playbackRate = savedRate;
-      
-      // Kích hoạt video chính tiếp tục phát ngay sau khi hết quảng cáo
-      try {
-        const p = player as any;
-        if (typeof p.playVideo === 'function') p.playVideo();
-      } catch {}
-      try {
-        if (video.paused) video.play();
-      } catch {}
     } else {
       // VIDEO CHÍNH ĐANG CHẠY BÌNH THƯỜNG:
       // TUYỆT ĐỐI KHÔNG CAN THIỆP video.play(), video.muted hay volume!
