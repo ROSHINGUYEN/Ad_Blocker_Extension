@@ -58,18 +58,18 @@
     for (const sel of AD_SELECTORS) {
       if (playerEl.querySelector(sel)) return true;
     }
-    // 3. Kiểm tra API nội bộ của player nếu có
+    // 3. Kiểm tra thanh thời gian/tiến trình màu vàng hoặc thanh ad hiển thị 0:00 / 0:10
+    const d = video.duration;
+    if (Number.isFinite(d) && d > 0 && d <= 120) {
+      return true;
+    }
+    // 4. Kiểm tra API nội bộ của player nếu có
     const p = playerEl as any;
     if (typeof p.getVideoData === 'function') {
       const data = p.getVideoData();
       if (data && (data.isLive === false || data.isLive === true) && data.adState > 0) {
         return true;
       }
-    }
-    // 4. Nếu video ngắn (<= 60s) VÀ có thuộc tính ad-created hoặc thời lượng phù hợp với commercial clip
-    const d = video.duration;
-    if (Number.isFinite(d) && d > 0 && d <= 120 && playerEl.querySelector('.video-ads')) {
-      return true;
     }
     return false;
   }
@@ -107,9 +107,13 @@
       });
 
       // 5. Tua an toàn: Tăng tốc 16x (chỉ mất ~0.3 - 0.7s để lướt qua clip quảng cáo 5s, 10s, 12s, 15s)
-      // TUYỆT ĐỐI KHÔNG GÁN video.currentTime (tránh làm gãy luồng MediaSource Buffer)
       if (video.playbackRate < 16.0) {
         video.playbackRate = 16.0;
+      }
+      // Nhảy thẳng tới cuối quảng cáo: YouTube hỗ trợ currentTime đối với video tag in-stream
+      const d = video.duration;
+      if (Number.isFinite(d) && d > 0 && d <= 120 && video.currentTime < d - 0.1) {
+        video.currentTime = d;
       }
     } else if (isAdActive) {
       // QUẢNG CÁO ĐÃ KẾT THÚC: Bàn giao lại quyền điều khiển cho người dùng
@@ -157,6 +161,15 @@
     if (video) {
       bindVideoEvents(video);
     }
+
+    // Poller nhẹ 200ms để đảm bảo không bị trượt frame ad
+    setInterval(() => {
+      const currentVid = el.querySelector<HTMLVideoElement>('video.html5-main-video, video');
+      if (currentVid) {
+        bindVideoEvents(currentVid);
+        handleAdState(currentVid);
+      }
+    }, 200);
 
     // Chỉ theo dõi class của player container (rất nhẹ, 0% CPU)
     const observer = new MutationObserver(() => {
