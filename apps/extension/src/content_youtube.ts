@@ -94,6 +94,10 @@
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
       adActive = false;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
       // Khôi phục âm thanh: mở tiếng lại cho video chính
       video.muted = false;
       try {
@@ -116,12 +120,10 @@
     if (!el || el === player) return;
     classObserver?.disconnect();
     player = el;
+    // CHỈ observe class của movie_player để biết khi nào ad xuất hiện/kết thúc
+    // TUYỆT ĐỐI KHÔNG observe subtree hay childList vì YouTube chèn DOM liên tục hàng nghìn lần/s gây sập browser
     classObserver = new MutationObserver(tick);
-    classObserver.observe(el, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
-    // Chạy vòng lặp thường trực 100ms để không bao giờ bị lọt frame quảng cáo
-    if (!pollTimer) {
-      pollTimer = setInterval(tick, 100);
-    }
+    classObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
     tick();
   }
 
