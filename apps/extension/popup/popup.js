@@ -76,32 +76,5 @@
         }
       });
     }
-    const ramBtn = document.getElementById("btn-ram");
-    if (ramBtn) {
-      const send = (message) => new Promise((resolve) => {
-        chrome.runtime.sendMessage(message, (res) => {
-          void chrome.runtime.lastError;
-          resolve(res);
-        });
-      });
-      ramBtn.addEventListener("click", async () => {
-        if (ramBtn.disabled) return;
-        ramBtn.disabled = true;
-        ramBtn.textContent = "\u23F3 \u0110ang t\u1ED1i \u01B0u...";
-        try {
-          const mem = await send({ type: "CLEAN_MEMORY_NOW" });
-          await send({ type: "CLEAR_CACHE_NOW" });
-          const total = (mem?.count || 0) + (mem?.closed || 0);
-          ramBtn.textContent = total > 0 ? `\u26A1 \u0110\xE3 gi\u1EA3i ph\xF3ng ${total} tab!` : "\u26A1 \u0110\xE3 d\u1ECDn cache & RAM!";
-        } catch {
-          ramBtn.textContent = "\u26A0\uFE0F Kh\xF4ng th\u1EC3 t\u1ED1i \u01B0u";
-        } finally {
-          setTimeout(() => {
-            ramBtn.textContent = "\u26A1 Gi\u1EA3i ph\xF3ng RAM";
-            ramBtn.disabled = false;
-          }, 2500);
-        }
-      });
-    }
   });
 })();

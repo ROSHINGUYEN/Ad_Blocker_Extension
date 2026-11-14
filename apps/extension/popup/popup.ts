@@ -89,35 +89,4 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-  // 5. Bind RAM Optimizer & Clean Cache button
-  const ramBtn = document.getElementById('btn-ram') as HTMLButtonElement | null;
-  if (ramBtn) {
-    const send = <T,>(message: { type: string }) =>
-      new Promise<T | undefined>((resolve) => {
-        chrome.runtime.sendMessage(message, (res: T | undefined) => {
-          void chrome.runtime.lastError; // tránh "Unchecked runtime.lastError"
-          resolve(res);
-        });
-      });
-
-    ramBtn.addEventListener('click', async () => {
-      if (ramBtn.disabled) return; // chống bấm đúp
-      ramBtn.disabled = true;
-      ramBtn.textContent = '⏳ Đang tối ưu...';
-      try {
-        const mem = await send<{ count?: number; closed?: number }>({ type: 'CLEAN_MEMORY_NOW' });
-        await send({ type: 'CLEAR_CACHE_NOW' });
-        const total = (mem?.count || 0) + (mem?.closed || 0);
-        ramBtn.textContent = total > 0 ? `⚡ Đã giải phóng ${total} tab!` : '⚡ Đã dọn cache & RAM!';
-      } catch {
-        ramBtn.textContent = '⚠️ Không thể tối ưu';
-      } finally {
-        setTimeout(() => {
-          ramBtn.textContent = '⚡ Giải phóng RAM';
-          ramBtn.disabled = false;
-        }, 2500);
-      }
-    });
-  }
 });
