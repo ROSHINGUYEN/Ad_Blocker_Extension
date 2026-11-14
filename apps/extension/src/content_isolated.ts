@@ -22,7 +22,7 @@ const SHIELD_SELECTORS: string[] = [
   ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`]),
   'iframe[src*="popads"]', 'iframe[src*="clickadu"]',
   // Quảng cáo YouTube ngoài luồng video & Hộp thoại Anti-Adblock
-  '.ytp-ad-overlay-container', '.ytp-ad-message-container',
+  '.ytp-ad-message-container',
   'ytd-ad-slot-renderer', '#player-ads', 'ytd-banner-promo-renderer', 'ytd-in-feed-ad-layout-renderer',
   'ytd-enforcement-message-view-model', 'tp-yt-paper-dialog:has(#feedback)', '.yt-playability-error-supported-renderers',
 ];
