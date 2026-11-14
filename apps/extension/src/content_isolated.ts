@@ -17,10 +17,13 @@ const SHIELD_SELECTORS: string[] = [
   '[class*="floating-ad"]', '[id*="floating-ad"]',
   '[class*="ad-sticky"]', '[id*="ad-sticky"]',
   '[class*="ads-holder"]', '[id*="ads-holder"]',
+  '[class*="banner-ads"]', '[id*="banner-ads"]',
+  '[class*="adv-"]', '[class*="-adv"]',
   'a[href*="pc-catfish"]', 'a[href*="topbanner"]',
+  'a[href*="vsbet"]', 'a[href*="sun88"]', 'a[href*="sunwin"]', 'a[href*="go88"]', 'a[href*="hitclub"]',
   // Link tới domain cờ bạc: neo vào đầu nhãn host để không trúng "sunwind", "logo88"...
-  ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`]),
-  'iframe[src*="popads"]', 'iframe[src*="clickadu"]',
+  ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`, `a[href*="/${l}"]`]),
+  'iframe[src*="popads"]', 'iframe[src*="clickadu"]', 'iframe[src*="ads"]',
   // Quảng cáo YouTube ngoài luồng video & Hộp thoại Anti-Adblock
   '.ytp-ad-message-container',
   'ytd-ad-slot-renderer', '#player-ads', 'ytd-banner-promo-renderer', 'ytd-in-feed-ad-layout-renderer',

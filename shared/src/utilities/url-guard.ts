@@ -6,10 +6,10 @@
  * false-positive hàng loạt (essex.ac.uk, javascript:, utm_campaign...).
  */
 
-/** Nhãn domain cờ bạc / game bài hay gặp. Khớp `gemwin`, `gemwin88`, `gemwin-88` nhưng KHÔNG khớp `sunwind` hay `logo88`. */
+/** Nhãn domain cờ bạc / game bài hay gặp. Khớp `gemwin`, `gemwin88`, `gemwin-88`, `vsbet`, `sun88` nhưng KHÔNG khớp `sunwind` hay `logo88`. */
 export const GAMBLING_LABELS: readonly string[] = [
   'gemwin', 'haywin', 'uk88', 'hitclub', 'win79', 'sunwin', 'yo88', 'rikvip',
-  'go88', 'bet88', 'tic88', 'zowin', 'cacuoc', 'gamebai', 'nhacai',
+  'go88', 'bet88', 'tic88', 'zowin', 'cacuoc', 'gamebai', 'nhacai', 'vsbet', 'sun88', 'sun', 'f8bet', 'jun88', 'new88', 'shbet', 'hi88', '789bet', 'okvip', 'kubet', 'thabet',
 ];
 
 /** Nhãn domain người lớn. */

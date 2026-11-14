@@ -55,11 +55,16 @@ import { isBlockedUrl, isSameSite } from '@shiori/shared/src/utilities/url-guard
 
   function onActivate(event: MouseEvent): void {
     const anchor = findAnchor(event);
-    if (!anchor || !isBlockedUrl(anchor.href)) return;
-    // Không xoá href / không đổi style (bản cũ làm hỏng link vĩnh viễn kể cả khi tắt extension)
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    notify('SHIORI_CLICK_BLOCKED');
+    if (!anchor) return;
+
+    // Chặn link cờ bạc/quảng cáo
+    const href = anchor.href || '';
+    if (isBlockedUrl(href) || /vsbet|sun88|sunwin|hitclub|go88|gemwin|uk88/i.test(href)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      console.log('[Shiori Shield] 🚫 Đã chặn click vào link quảng cáo/cờ bạc:', href);
+      notify('SHIORI_CLICK_BLOCKED');
+    }
   }
 
   window.addEventListener('click', onActivate, true);
