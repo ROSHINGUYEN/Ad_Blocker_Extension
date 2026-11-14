@@ -285,3 +285,19 @@
   - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
   - Bundle `apps/extension` được build thành công. (ĐÃ HOÀN THÀNH)
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-14 — Gỡ Bỏ Hoàn Toàn regexFilter Nặng Trong rules.json Để Tránh Lỗi 2KB Chrome
+
+- **Mục tiêu:**
+  - Khắc phục triệt để lỗi: `Rule with id 6 was skipped as the "regexFilter" value exceeded the 2KB memory limit when compiled`.
+  - Chromium RE2 regex engine có giới hạn biên dịch trạng thái máy hữu hạn (DFA memory budget) rất nghiêm ngặt là 2KB cho mỗi quy tắc DeclarativeNetRequest. Mọi regex chứa quá nhiều nhánh nhóm luân phiên `(a|b|c...)` kết hợp với lặp tiền tố/hậu tố đều bị Chrome tự động bỏ qua khi nạp extension.
+  - Chuyển đổi toàn bộ việc chặn mạng trong `rules.json` sang định dạng `urlFilter` chuẩn Adblock (`||domain^`) gọn gàng, chạy với tốc độ hash O(1) và không tiêu tốn bộ nhớ regex. Việc lọc domain cờ bạc/18+ động được xử lý bởi `content_main.ts` và `url-guard.ts`.
+- **Tiêu chí hoàn thành:**
+  - `rules.json` sạch 100%, không còn chứa `regexFilter`, không bao giờ bị Chrome báo lỗi 2KB. (ĐÃ HOÀN THÀNH)
+  - `pnpm -r run typecheck`: 0 lỗi. (ĐÃ HOÀN THÀNH)
+  - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
+  - Build extension thành công. (ĐÃ HOÀN THÀNH)
+- **Trạng thái:** PASS
