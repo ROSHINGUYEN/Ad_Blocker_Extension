@@ -57,12 +57,12 @@ import { isBlockedUrl, isSameSite } from '@shiori/shared/src/utilities/url-guard
     const anchor = findAnchor(event);
     if (!anchor) return;
 
-    // Chặn link cờ bạc/quảng cáo
+    // Chặn link cờ bạc/quảng cáo/18+
     const href = anchor.href || '';
-    if (isBlockedUrl(href) || /zo88|vsbet|sun88|sunwin|hitclub|go88|gemwin|uk88/i.test(href)) {
+    if (isBlockedUrl(href) || /zo88|vsbet|sun88|sunwin|hitclub|go88|gemwin|uk88|pornhub|xvideos|xnxx|vlxx|phimsex|hentai|sex/i.test(href)) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      console.log('[Shiori Shield] 🚫 Đã chặn click vào link quảng cáo/cờ bạc:', href);
+      console.log('[Shiori Shield] 🚫 Đã chặn click vào link quảng cáo/cờ bạc/18+:', href);
       notify('SHIORI_CLICK_BLOCKED');
     }
   }

@@ -23,8 +23,9 @@ const SHIELD_SELECTORS: string[] = [
   'a[href*="pc-catfish"]', 'a[href*="topbanner"]',
   'a[href*="vsbet"]', 'a[href*="sun88"]', 'a[href*="sunwin"]', 'a[href*="go88"]', 'a[href*="hitclub"]',
   'img[src*="vsbet"]', 'img[src*="sun88"]', 'img[src*="sunwin"]', 'img[src*="banner"]', 'img[alt*="vsbet"]', 'img[alt*="sun88"]',
-  // Link tới domain cờ bạc: neo vào đầu nhãn host để không trúng "sunwind", "logo88"...
+  // Link tới domain cờ bạc & 18+
   ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`, `a[href*="/${l}"]`, `img[src*="${l}"]`]),
+  ...ADULT_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`, `a[href*="/${l}"]`]),
   'iframe[src*="popads"]', 'iframe[src*="clickadu"]', 'iframe[src*="ads"]',
   // Quảng cáo YouTube ngoài luồng video & Hộp thoại Anti-Adblock
   '.ytp-ad-message-container',

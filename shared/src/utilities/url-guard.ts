@@ -12,8 +12,11 @@ export const GAMBLING_LABELS: readonly string[] = [
   'go88', 'bet88', 'tic88', 'zowin', 'zo88', 'cacuoc', 'gamebai', 'nhacai', 'vsbet', 'sun88', 'sun', 'f8bet', 'jun88', 'new88', 'shbet', 'hi88', '789bet', 'okvip', 'kubet', 'thabet',
 ];
 
-/** Nhãn domain người lớn. */
-export const ADULT_LABELS: readonly string[] = ['pornhub', 'xvideos', 'xnxx', 'vlxx', 'phimsex', 'hentai'];
+/** Nhãn domain người lớn / 18+. */
+export const ADULT_LABELS: readonly string[] = [
+  'pornhub', 'xvideos', 'xnxx', 'vlxx', 'phimsex', 'hentai', 'sextop1', 'sex', 'javhd', 'jav',
+  'lauxanh', 'thichxemsex', 'clipsex', 'phimxxx', 'xxx', 'chaturbate', 'onlyfans', 'stripchat', 'xhamster', 'redtube',
+];
 
 /** Domain mạng quảng cáo pop-under (khớp domain + mọi subdomain). */
 export const AD_NETWORK_DOMAINS: readonly string[] = [
