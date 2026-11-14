@@ -44,6 +44,17 @@
     },
     {
       "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content_main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": [
         "*://*.youtube.com/*"
       ],
       "js": [
