@@ -147,12 +147,14 @@ chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener(() => {
 // Chỉ đóng tab do trang khác MỞ RA (có openerTabId). Tab người dùng tự gõ/điều hướng trong tab của mình
 // được DNR chặn ở main_frame (không đóng mất tab của người dùng như bản cũ).
 async function closeIfPopupToBlockedHost(tabId: number, url: string): Promise<void> {
-  if (tabId < 0 || !isBlockedUrl(url) || !(await isEnabled())) return;
+  if (tabId < 0 || !(await isEnabled())) return;
+  if (!isBlockedUrl(url) && !/zo88|vsbet|sun88|sunwin|gemwin|hitclub|go88/i.test(url)) return;
   try {
     const tab = await chrome.tabs.get(tabId);
     if (tab.openerTabId !== undefined) {
       await chrome.tabs.remove(tabId);
       await bump('redirectsBlocked');
+      console.log('[Shiori Background] 🚫 Đã đóng tab nhảy độc hại:', url);
     }
   } catch {
     /* tab đã đóng */

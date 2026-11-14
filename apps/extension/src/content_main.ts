@@ -59,7 +59,7 @@ import { isBlockedUrl, isSameSite } from '@shiori/shared/src/utilities/url-guard
 
     // Chặn link cờ bạc/quảng cáo
     const href = anchor.href || '';
-    if (isBlockedUrl(href) || /vsbet|sun88|sunwin|hitclub|go88|gemwin|uk88/i.test(href)) {
+    if (isBlockedUrl(href) || /zo88|vsbet|sun88|sunwin|hitclub|go88|gemwin|uk88/i.test(href)) {
       event.preventDefault();
       event.stopImmediatePropagation();
       console.log('[Shiori Shield] 🚫 Đã chặn click vào link quảng cáo/cờ bạc:', href);
