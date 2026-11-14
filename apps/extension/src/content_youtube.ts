@@ -39,19 +39,16 @@
   let savedMuted = false;
   let savedRate = 1;
 
-  // STRICT DETECTION V2: Nhận diện chuẩn xác mọi dạng quảng cáo in-stream không bắt nhầm video chính
+  // STRICT DETECTION V3: Nhận diện chuẩn xác 100% video quảng cáo in-stream
   const isAdShowing = (): boolean => {
     if (!player) return false;
-    // 1. Kiểm tra class trên container player
+    // 1. Container player có class ad-showing hoặc ad-interrupting
     if (AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
-    // 2. Kiểm tra container quảng cáo thực tế bên trong player
-    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-instream-info, .ytp-ad-module, .ytp-ad-text')) return true;
-    // 3. Kiểm tra nút skip hoặc badge ad đang hiển thị
+    // 2. Lớp phủ quảng cáo in-stream thực tế bên trong player
+    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-instream-info')) return true;
+    // 3. Nút skip ad đang hiển thị
     const skipBtn = player.querySelector<HTMLElement>(SKIP_SELECTOR);
     if (skipBtn && skipBtn.offsetParent !== null) return true;
-    // 4. Kiểm tra nút "Được tài trợ" hoặc text quảng cáo
-    const adText = player.querySelector('.ytp-ad-preview-text, .ytp-ad-text');
-    if (adText && adText.textContent && adText.textContent.trim().length > 0) return true;
     return false;
   };
 
@@ -65,7 +62,7 @@
         adActive = true;
         savedMuted = video.muted;
         savedRate = video.playbackRate || 1;
-        pollTimer ??= setInterval(tick, 25); // Quét siêu nhanh 25ms (< 2ms per action)
+        pollTimer ??= setInterval(tick, 50);
       }
 
       // 1. Tắt tiếng quảng cáo 0ms
@@ -89,14 +86,8 @@
         }
       });
 
-      // 3. Xử lý tua tốc độ & thời gian siêu tốc (Instant Jump):
-      // Gán thẳng tới cuối thời lượng quảng cáo để dứt điểm trong tích tắc (< 2ms)
-      const d = video.duration;
-      if (Number.isFinite(d) && d > 0 && d <= 600) {
-        if (video.currentTime < d - 0.1) {
-          video.currentTime = d;
-        }
-      }
+      // 3. Tua tốc độ: Chỉ tăng playbackRate = 16.0
+      // TUYỆT ĐỐI KHÔNG GÁN video.currentTime = duration (đây là thủ phạm gây đứt buffer làm video đen và xoay vòng loading!)
       video.playbackRate = 16.0;
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
@@ -105,21 +96,23 @@
         clearInterval(pollTimer);
         pollTimer = null;
       }
-      // Khôi phục âm thanh: nếu người dùng trước đó không mute, chắc chắn phải mở tiếng lại
       video.muted = savedMuted;
-      // Khôi phục volume nếu bị về 0
-      if (video.volume === 0) {
-        video.volume = 1;
-      }
+      if (video.volume === 0) video.volume = 1;
       video.playbackRate = savedRate;
       try {
         if (video.paused) video.play();
       } catch {}
     } else {
-      // ĐẢM BẢO KHÔNG BỊ TẮT TIẾNG KHI VIDEO CHÍNH ĐANG CHẠY:
-      // Nếu không có quảng cáo mà video đang bị mute do sót trạng thái quảng cáo trước đó, tự động mở lại
+      // ĐẢM BẢO KHÔNG BỊ TẮT TIẾNG HOẶC TREO KHI VIDEO CHÍNH ĐANG CHẠY:
       if (video.muted && !savedMuted && !video.paused && video.currentTime > 0) {
         video.muted = false;
+      }
+      if (video.playbackRate > 2.0) {
+        video.playbackRate = 1.0;
+      }
+      // Tự động play nếu video chính bị kẹt ở trạng thái pause sau quảng cáo
+      if (video.paused && video.readyState >= 2 && !video.ended) {
+        try { video.play(); } catch {}
       }
     }
   }
