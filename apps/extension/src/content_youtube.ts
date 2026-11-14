@@ -94,17 +94,15 @@
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
       adActive = false;
-      // Khôi phục âm thanh: mở tiếng lại 100% cho video chính
+      // Khôi phục âm thanh: mở tiếng lại cho video chính
       video.muted = false;
       try {
         const p = player as any;
         if (typeof p.unMute === 'function') p.unMute();
       } catch {}
-      if (video.volume === 0) video.volume = 1;
       video.playbackRate = savedRate;
       
-      // Khắc phục triệt để màn hình đen + icon xoay loading:
-      // Kích hoạt ngay video.play() và player.playVideo()
+      // Kích hoạt video chính tiếp tục phát ngay sau khi hết quảng cáo
       try {
         const p = player as any;
         if (typeof p.playVideo === 'function') p.playVideo();
@@ -113,24 +111,11 @@
         if (video.paused) video.play();
       } catch {}
     } else {
-      // ĐẢM BẢO KHÔNG BỊ TẮT TIẾNG HOẶC TREO KHI VIDEO CHÍNH ĐANG CHẠY:
-      if (video.muted && !video.paused && video.currentTime > 0) {
-        video.muted = false;
-        try {
-          const p = player as any;
-          if (typeof p.unMute === 'function') p.unMute();
-        } catch {}
-      }
+      // VIDEO CHÍNH ĐANG CHẠY BÌNH THƯỜNG:
+      // TUYỆT ĐỐI KHÔNG CAN THIỆP video.play(), video.muted hay volume!
+      // Để người dùng toàn quyền bấm tạm dừng (pause/play) hoặc kéo chỉnh âm thanh tùy ý.
       if (video.playbackRate > 2.0) {
         video.playbackRate = 1.0;
-      }
-      // Tự động giải phóng màn hình đen & loading spinner:
-      if (video.paused && !video.ended) {
-        try {
-          const p = player as any;
-          if (typeof p.playVideo === 'function') p.playVideo();
-          video.play();
-        } catch {}
       }
     }
   }
