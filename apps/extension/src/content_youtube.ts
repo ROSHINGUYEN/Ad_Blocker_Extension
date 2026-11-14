@@ -36,14 +36,12 @@
   let classObserver: MutationObserver | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let adActive = false;
-  let savedMuted = false;
   let savedRate = 1;
 
   // STRICT DETECTION 100%: CHỈ KHI CONTAINER MOVIE_PLAYER THỰC SỰ CÓ CLASS AD-SHOWING / AD-INTERRUPTING
-  // Tuyệt đối không kiểm tra querySelector lớp phủ hay text vì các thẻ rác trong DOM vẫn còn sau khi ad hết
   const isAdShowing = (): boolean => {
     if (!player) return false;
-    return player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting');
+    return AD_CLASSES.some((c) => player!.classList.contains(c));
   };
 
   function tick(): void {
@@ -54,7 +52,6 @@
     if (isAdShowing()) {
       if (!adActive) {
         adActive = true;
-        savedMuted = video.muted;
         savedRate = video.playbackRate || 1;
         pollTimer ??= setInterval(tick, 50);
       }
@@ -93,7 +90,12 @@
         clearInterval(pollTimer);
         pollTimer = null;
       }
-      video.muted = savedMuted;
+      // Khôi phục âm thanh: mở tiếng lại 100% cho video chính
+      video.muted = false;
+      try {
+        const p = player as any;
+        if (typeof p.unMute === 'function') p.unMute();
+      } catch {}
       if (video.volume === 0) video.volume = 1;
       video.playbackRate = savedRate;
       try {
@@ -101,8 +103,12 @@
       } catch {}
     } else {
       // ĐẢM BẢO KHÔNG BỊ TẮT TIẾNG HOẶC TREO KHI VIDEO CHÍNH ĐANG CHẠY:
-      if (video.muted && !savedMuted && !video.paused && video.currentTime > 0) {
+      if (video.muted && !video.paused && video.currentTime > 0) {
         video.muted = false;
+        try {
+          const p = player as any;
+          if (typeof p.unMute === 'function') p.unMute();
+        } catch {}
       }
       if (video.playbackRate > 2.0) {
         video.playbackRate = 1.0;
