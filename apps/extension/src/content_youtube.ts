@@ -102,11 +102,22 @@
         clearInterval(pollTimer);
         pollTimer = null;
       }
+      // Khôi phục âm thanh: nếu người dùng trước đó không mute, chắc chắn phải mở tiếng lại
       video.muted = savedMuted;
+      // Khôi phục volume nếu bị về 0
+      if (video.volume === 0) {
+        video.volume = 1;
+      }
       video.playbackRate = savedRate;
       try {
         if (video.paused) video.play();
       } catch {}
+    } else {
+      // ĐẢM BẢO KHÔNG BỊ TẮT TIẾNG KHI VIDEO CHÍNH ĐANG CHẠY:
+      // Nếu không có quảng cáo mà video đang bị mute do sót trạng thái quảng cáo trước đó, tự động mở lại
+      if (video.muted && !savedMuted && !video.paused && video.currentTime > 0) {
+        video.muted = false;
+      }
     }
   }
 
