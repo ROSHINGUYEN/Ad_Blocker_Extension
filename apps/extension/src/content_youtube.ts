@@ -40,16 +40,25 @@
 
   // STRICT DETECTION:
   // 1. Container movie_player có class ad-showing hoặc ad-interrupting
-  // 2. HOẶC chứa overlay quảng cáo in-stream thực sự
-  // TUYỆT ĐỐI CHỈ COI LÀ QUẢNG CÁO KHI THỜI LƯỢNG VIDEO <= 120 GIÂY
-  // Video dài (như video 1h48m của người dùng) KHÔNG BAO GIỜ bị tính là quảng cáo!
+  // 2. HOẶC chứa overlay quảng cáo / nhãn thời gian quảng cáo / thanh tiến trình ad
+  // 3. HOẶC có nút Skip Ad trong DOM
   const isAdShowing = (video: HTMLVideoElement): boolean => {
     if (!player) return false;
-    const d = video.duration;
-    if (Number.isFinite(d) && d > 120) return false;
-
+    
+    // Nếu player có class ad-showing / ad-interrupting -> 100% là ad
     if (AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
-    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-preview-container, .ytp-ad-duration-remaining')) return true;
+
+    // Nếu có overlay ad hoặc nút Skip Ad xuất hiện trong player -> 100% là ad
+    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-preview-container, .ytp-ad-duration-remaining, .ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-text')) {
+      return true;
+    }
+
+    // Nếu thời lượng video <= 120 giây (chắc chắn là clip quảng cáo)
+    const d = video.duration;
+    if (Number.isFinite(d) && d > 0 && d <= 120) {
+      return true;
+    }
+
     return false;
   };
 
