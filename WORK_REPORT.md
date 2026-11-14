@@ -301,3 +301,23 @@
   - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
   - Build extension thành công. (ĐÃ HOÀN THÀNH)
 - **Trạng thái:** PASS
+
+---
+
+## 2026-11-14 — Fix Lỗi Mất Âm Thanh & Bảo Vệ Video Chính
+
+- **Mục tiêu:**
+  - Khắc phục triệt để lỗi mất âm thanh của video chính sau khi quảng cáo kết thúc hoặc khi xem video.
+  - Ngăn chặn hoàn toàn việc tua nhầm video chính (> 120s) và giữ âm thanh phát bình thường.
+- **Phân tích nguyên nhân:**
+  1. Biến `savedMuted` lưu trạng thái của video khi ad xuất hiện. Nếu video chính vừa load đang ở trạng thái mute tạm thời do autoplay policy của YouTube, `savedMuted` bị lưu thành `true`. Khi ad kết thúc, script gán ngược lại `video.muted = true` khiến video chính bị tắt tiếng.
+  2. YouTube player API có trạng thái âm thanh nội bộ riêng; chỉ gán `video.muted = false` trên DOM element đôi khi bị player engine của YouTube đồng bộ đè lại. Cần gọi trực tiếp API `player.unMute()`.
+- **Giải pháp triển khai:**
+  - Xóa bỏ hoàn toàn biến `savedMuted`. Khi quảng cáo kết thúc, lập tức bật tiếng video chính: `video.muted = false`, gọi `player.unMute()`, và khôi phục `video.volume = 1` nếu đang ở mức 0.
+  - Trong nhánh `else` (khi không có quảng cáo và video đang phát), tự động kiểm tra và bỏ mute nếu video bị kẹt ở trạng thái muted: `video.muted = false; player.unMute();`.
+  - Khống chế thời lượng tua tốc độ 16x: CHỈ áp dụng khi `video.duration <= 120` giây (video thường dài hơn không bao giờ bị tua).
+- **Tiêu chí hoàn thành:**
+  - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
+  - Build extension và đóng gói lại `ad-blocker-extension-ready.zip`. (ĐÃ HOÀN THÀNH)
+- **Trạng thái:** PASS
+
