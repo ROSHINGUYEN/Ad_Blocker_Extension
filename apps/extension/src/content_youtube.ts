@@ -39,17 +39,11 @@
   let savedMuted = false;
   let savedRate = 1;
 
-  // STRICT DETECTION V3: Nhận diện chuẩn xác 100% video quảng cáo in-stream
+  // STRICT DETECTION 100%: CHỈ KHI CONTAINER MOVIE_PLAYER THỰC SỰ CÓ CLASS AD-SHOWING / AD-INTERRUPTING
+  // Tuyệt đối không kiểm tra querySelector lớp phủ hay text vì các thẻ rác trong DOM vẫn còn sau khi ad hết
   const isAdShowing = (): boolean => {
     if (!player) return false;
-    // 1. Container player có class ad-showing hoặc ad-interrupting
-    if (AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
-    // 2. Lớp phủ quảng cáo in-stream thực tế bên trong player
-    if (player.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-instream-info')) return true;
-    // 3. Nút skip ad đang hiển thị
-    const skipBtn = player.querySelector<HTMLElement>(SKIP_SELECTOR);
-    if (skipBtn && skipBtn.offsetParent !== null) return true;
-    return false;
+    return player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting');
   };
 
   function tick(): void {
@@ -86,9 +80,12 @@
         }
       });
 
-      // 3. Tua tốc độ: Chỉ tăng playbackRate = 16.0
-      // TUYỆT ĐỐI KHÔNG GÁN video.currentTime = duration (đây là thủ phạm gây đứt buffer làm video đen và xoay vòng loading!)
-      video.playbackRate = 16.0;
+      // 3. Tua tốc độ: CHỈ tua khi video thực sự là quảng cáo ngắn (thời lượng <= 120s)
+      // KHÔNG BAO GIỜ tua nếu thời lượng > 120s (để bảo vệ 100% video chính của người dùng không bao giờ bị tua nhầm)
+      const d = video.duration;
+      if (Number.isFinite(d) && d > 0 && d <= 120) {
+        video.playbackRate = 16.0;
+      }
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
       adActive = false;
