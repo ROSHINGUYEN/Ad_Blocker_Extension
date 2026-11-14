@@ -37,6 +37,7 @@
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let adActive = false;
   let savedRate = 1;
+  let isTicking = false;
 
   // STRICT DETECTION:
   // 1. Container movie_player có class ad-showing hoặc ad-interrupting
@@ -63,65 +64,64 @@
   };
 
   function tick(): void {
-    if (!player?.isConnected) return;
+    if (isTicking || !player?.isConnected) return;
     const video = player.querySelector<HTMLVideoElement>('video.html5-main-video, video');
     if (!video) return;
 
-    if (isAdShowing(video)) {
-      if (!adActive) {
-        adActive = true;
-        savedRate = video.playbackRate || 1;
-        pollTimer ??= setInterval(tick, 50);
-      }
+    isTicking = true;
+    try {
+      if (isAdShowing(video)) {
+        if (!adActive) {
+          adActive = true;
+          savedRate = video.playbackRate || 1;
+        }
 
-      // 1. Tắt tiếng quảng cáo 0ms
-      video.muted = true;
+        // 1. Tắt tiếng quảng cáo 0ms
+        video.muted = true;
 
-      // 2. Tự động click các loại nút Skip Ad
-      try {
-        const p = player as any;
-        if (typeof p.skipAd === 'function') p.skipAd();
-      } catch {}
+        // 2. Tự động click các loại nút Skip Ad
+        try {
+          const p = player as any;
+          if (typeof p.skipAd === 'function') p.skipAd();
+        } catch {}
 
-      const skipButtons = player.querySelectorAll<HTMLElement>(SKIP_SELECTOR);
-      skipButtons.forEach((btn) => {
-        dispatchSyntheticClick(btn);
-      });
-
-      player.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text, button.ytp-ad-skip-button').forEach((btn) => {
-        const txt = btn.textContent?.trim().toLowerCase() || '';
-        if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
+        const skipButtons = player.querySelectorAll<HTMLElement>(SKIP_SELECTOR);
+        skipButtons.forEach((btn) => {
           dispatchSyntheticClick(btn);
-        }
-      });
+        });
 
-      // 3. Tua tốc độ: CHỈ tua khi video thực sự là quảng cáo ngắn (thời lượng <= 120s)
-      const d = video.duration;
-      if (Number.isFinite(d) && d > 0 && d <= 120) {
-        video.playbackRate = 16.0;
-        // Nếu là quảng cáo không có nút skip (non-skippable) như quảng cáo 10s trong ảnh:
-        // Tua nhanh an toàn bằng cách nhảy về gần cuối quảng cáo
-        if (video.currentTime < d - 0.2) {
-          video.currentTime = d - 0.1;
+        player.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text, button.ytp-ad-skip-button').forEach((btn) => {
+          const txt = btn.textContent?.trim().toLowerCase() || '';
+          if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
+            dispatchSyntheticClick(btn);
+          }
+        });
+
+        // 3. Tua tốc độ: CHỈ tua khi video thực sự là quảng cáo ngắn (thời lượng <= 120s)
+        const d = video.duration;
+        if (Number.isFinite(d) && d > 0 && d <= 120) {
+          video.playbackRate = 16.0;
+          if (video.currentTime < d - 0.2) {
+            video.currentTime = d - 0.1;
+          }
+        }
+      } else if (adActive) {
+        // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
+        adActive = false;
+        // Khôi phục âm thanh: mở tiếng lại cho video chính
+        video.muted = false;
+        try {
+          const p = player as any;
+          if (typeof p.unMute === 'function') p.unMute();
+        } catch {}
+        video.playbackRate = savedRate;
+      } else {
+        if (video.playbackRate > 2.0) {
+          video.playbackRate = 1.0;
         }
       }
-    } else if (adActive) {
-      // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
-      adActive = false;
-      // Khôi phục âm thanh: mở tiếng lại cho video chính
-      video.muted = false;
-      try {
-        const p = player as any;
-        if (typeof p.unMute === 'function') p.unMute();
-      } catch {}
-      video.playbackRate = savedRate;
-    } else {
-      // VIDEO CHÍNH ĐANG CHẠY BÌNH THƯỜNG:
-      // TUYỆT ĐỐI KHÔNG CAN THIỆP video.play(), video.muted hay volume!
-      // Để người dùng toàn quyền bấm tạm dừng (pause/play) hoặc kéo chỉnh âm thanh tùy ý.
-      if (video.playbackRate > 2.0) {
-        video.playbackRate = 1.0;
-      }
+    } finally {
+      isTicking = false;
     }
   }
 
@@ -129,29 +129,36 @@
     const el = document.getElementById('movie_player');
     if (!el || el === player) return;
     classObserver?.disconnect();
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
     player = el;
     classObserver = new MutationObserver(tick);
     classObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
 
-    // Kiểm tra định kỳ nhẹ nhàng mỗi 250ms (chỉ tốn ~0.01% CPU)
-    // Đảm bảo không bao giờ bị sót khi YouTube chèn quảng cáo 10s không đổi class
-    if (!pollTimer) {
-      pollTimer = setInterval(tick, 250);
-    }
+    // Poller 500ms nhẹ nhàng (chạy cực ít chu kỳ, 0% CPU)
+    pollTimer = setInterval(tick, 500);
     tick();
   }
 
-  // Chờ player xuất hiện (document_start): gộp bằng rAF để không chạy theo từng mutation
-  let scheduled = false;
-  new MutationObserver(() => {
-    if (scheduled || player?.isConnected) return;
-    scheduled = true;
-    requestAnimationFrame(() => {
-      scheduled = false;
-      bindPlayer();
+  // Chờ player xuất hiện: ngắt quan sát ngay khi tìm thấy player
+  function initObserver(): void {
+    bindPlayer();
+    if (player?.isConnected) return;
+
+    const docObserver = new MutationObserver((_mutations, obs) => {
+      const el = document.getElementById('movie_player');
+      if (el) {
+        obs.disconnect(); // Ngắt ngay lập tức, giải phóng hoàn toàn CPU!
+        bindPlayer();
+      }
     });
-  }).observe(document.documentElement, { childList: true, subtree: true });
+
+    docObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
 
   window.addEventListener('yt-navigate-finish', bindPlayer, true);
-  bindPlayer();
+  initObserver();
 })();
