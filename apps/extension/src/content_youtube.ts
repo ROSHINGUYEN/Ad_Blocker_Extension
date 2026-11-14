@@ -86,12 +86,17 @@
         }
       });
 
-      // 3. Tua tốc độ an toàn 16x (KHÔNG can thiệp video.currentTime để tránh đứt stream SSAI)
-      if (video.playbackRate < 16) {
-        video.playbackRate = 16.0;
+      // 3. Xử lý tua tốc độ:
+      // - Nếu có nút Skip Ad: giữ tốc độ bình thường hoặc 2x để YouTube API skipAd() chuyển mượt mà (không bị đứt buffer đen 2s)
+      // - Nếu là Unskippable Bumper (không có nút skip): tăng 16x để lướt qua nhanh
+      const hasSkipButton = skipButtons.length > 0 || !!player.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .videoAdUiSkipButton');
+      if (hasSkipButton) {
+        if (video.playbackRate > 2) video.playbackRate = 2.0;
+      } else {
+        if (video.playbackRate < 16) video.playbackRate = 16.0;
       }
     } else if (adActive) {
-      // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
+      // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
       adActive = false;
       if (pollTimer) {
         clearInterval(pollTimer);
@@ -99,6 +104,9 @@
       }
       video.muted = savedMuted;
       video.playbackRate = savedRate;
+      try {
+        if (video.paused) video.play();
+      } catch {}
     }
   }
 

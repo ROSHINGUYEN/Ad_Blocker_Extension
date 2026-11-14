@@ -109,12 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const mem = await send<{ count?: number; closed?: number }>({ type: 'CLEAN_MEMORY_NOW' });
         await send({ type: 'CLEAR_CACHE_NOW' });
         const total = (mem?.count || 0) + (mem?.closed || 0);
-        ramBtn.textContent = total > 0 ? `⚡ Đã giải phóng ${total} tab!` : '⚡ Đã dọn bộ nhớ đệm!';
+        ramBtn.textContent = total > 0 ? `⚡ Đã giải phóng ${total} tab!` : '⚡ Đã dọn cache & RAM!';
       } catch {
         ramBtn.textContent = '⚠️ Không thể tối ưu';
       } finally {
         setTimeout(() => {
-          ramBtn.textContent = '⚡ Tối ưu RAM';
+          ramBtn.textContent = '⚡ Giải phóng RAM';
           ramBtn.disabled = false;
         }, 2500);
       }
