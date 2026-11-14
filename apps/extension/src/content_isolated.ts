@@ -105,17 +105,36 @@ window.addEventListener('message', (event) => {
   }, 1000);
 });
 
-// 4) Đếm số phần tử bị khiên ẩn — đúng MỘT lần sau khi tải xong, lúc trình duyệt rảnh
-window.addEventListener('load', () => {
-  const run = () => {
-    if (!enabled) return;
-    try {
-      const n = document.querySelectorAll(SHIELD_SELECTORS.join(',')).length;
-      if (n > 0) send({ type: 'INCREMENT_DOM_HIDDEN', payload: { count: n } });
-    } catch {
-      /* selector không hợp lệ không được làm hỏng trang */
+// 4) Đếm và báo cáo số phần tử quảng cáo đã chặn trên trang
+function countHiddenAds(): void {
+  if (!enabled) return;
+  try {
+    const list = document.querySelectorAll(SHIELD_SELECTORS.join(','));
+    let hiddenCount = 0;
+    list.forEach((el) => {
+      // Đảm bảo phần tử được ẩn tuyệt đối
+      const htmlEl = el as HTMLElement;
+      if (htmlEl.style.display !== 'none') {
+        htmlEl.style.setProperty('display', 'none', 'important');
+      }
+      hiddenCount++;
+    });
+
+    if (hiddenCount > 0) {
+      console.log(`[Shiori Shield] Đã dọn dẹp ${hiddenCount} phần tử quảng cáo trên trang.`);
+      send({ type: 'INCREMENT_DOM_HIDDEN', payload: { count: hiddenCount } });
     }
-  };
-  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 3000 });
-  else setTimeout(run, 1500);
-}, { once: true });
+  } catch (e) {
+    console.debug('[Shiori Shield] Error counting elements:', e);
+  }
+}
+
+// Chạy ngay khi DOM sẵn sàng và quét lại sau đó
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', countHiddenAds, { once: true });
+} else {
+  countHiddenAds();
+}
+window.addEventListener('load', countHiddenAds, { once: true });
+// Quét thêm sau 2s để bắt các banner render muộn qua JS
+setTimeout(countHiddenAds, 2000);

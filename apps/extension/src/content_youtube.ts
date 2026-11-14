@@ -39,6 +39,11 @@
     if (isAdShowing()) {
       if (!adActive) {
         adActive = true;
+        console.log('[Shiori YT Debug] 🎯 Phát hiện quảng cáo! Kích hoạt chế độ tắt tiếng và tăng tốc 16x.');
+        // Báo về background để hiển thị lên popup thống kê
+        try {
+          window.postMessage({ source: 'shiori-main', type: 'SHIORI_CLICK_BLOCKED' }, '*');
+        } catch {}
       }
       if (video) {
         video.muted = true;
@@ -50,14 +55,21 @@
       // Skip API
       try {
         const p = player as any;
-        if (typeof p.skipAd === 'function') p.skipAd();
+        if (typeof p.skipAd === 'function') {
+          p.skipAd();
+          console.log('[Shiori YT Debug] ⏩ Đã gọi player.skipAd()');
+        }
       } catch {}
 
       // Click Skip Buttons
-      player.querySelectorAll<HTMLElement>(SKIP_SELECTOR).forEach((btn) => dispatchSyntheticClick(btn));
+      player.querySelectorAll<HTMLElement>(SKIP_SELECTOR).forEach((btn) => {
+        console.log('[Shiori YT Debug] 👆 Click nút Skip Ad');
+        dispatchSyntheticClick(btn);
+      });
       player.querySelectorAll<HTMLElement>('.video-ads button, button.ytp-ad-skip-button').forEach((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
         if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
+          console.log('[Shiori YT Debug] 👆 Click nút Bỏ qua văn bản');
           dispatchSyntheticClick(btn);
         }
       });
@@ -72,6 +84,7 @@
       }
       if (adActive) {
         adActive = false;
+        console.log('[Shiori YT Debug] ✅ Quảng cáo đã hết. Phục hồi âm thanh và tốc độ 1.0x.');
         if (video) {
           video.muted = false;
           try {
