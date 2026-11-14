@@ -42,7 +42,7 @@
   // STRICT DETECTION 100%: CHỈ KHI CONTAINER MOVIE_PLAYER THỰC SỰ CÓ CLASS AD-SHOWING / AD-INTERRUPTING
   const isAdShowing = (): boolean => {
     if (!player) return false;
-    return player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting');
+    return AD_CLASSES.some(cls => player!.classList.contains(cls));
   };
 
   function tick(): void {

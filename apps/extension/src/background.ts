@@ -40,7 +40,7 @@ let stats: ProtectionStatistics = {
 };
 
 function statsArea(): chrome.storage.StorageArea {
-  return chrome.storage.session ?? chrome.storage.local;
+  return chrome.storage.local;
 }
 
 const statsReady: Promise<void> = (async () => {

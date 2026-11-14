@@ -49,6 +49,19 @@
       });
     }
     function updateStats() {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(["shiori_stats"], (data) => {
+          const stats = data?.shiori_stats;
+          if (stats) {
+            const popupElem = document.getElementById("stat-popups");
+            const domElem = document.getElementById("stat-dom");
+            const netElem = document.getElementById("stat-network");
+            if (popupElem) popupElem.textContent = String(stats.redirectsBlocked || 0);
+            if (domElem) domElem.textContent = String(stats.elementsHidden || 0);
+            if (netElem) netElem.textContent = String(stats.requestsFiltered || 0);
+          }
+        });
+      }
       if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage({ type: "GET_STATS" }, (res) => {
           if (res?.stats) {
@@ -63,6 +76,7 @@
       }
     }
     updateStats();
+    setInterval(updateStats, 1e3);
     const refreshBtn = document.getElementById("btn-refresh");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", () => {
