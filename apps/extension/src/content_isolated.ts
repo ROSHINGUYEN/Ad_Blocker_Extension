@@ -6,7 +6,7 @@
  *  - setInterval 250ms quét toàn DOM trên mọi trang.
  *  - Selector quá rộng làm ẩn nội dung hợp lệ: a[href*="utm_..."], [class*="adv-"], [class*="bottom-fixed"], ...
  */
-import { GAMBLING_LABELS } from '@shiori/shared/src/utilities/url-guard';
+import { GAMBLING_LABELS, ADULT_LABELS } from '@shiori/shared/src/utilities/url-guard';
 
 const SHIELD_ID = 'shiori-instant-shield';
 const COSMETIC_ID = 'shiori-cosmetic-styles';
