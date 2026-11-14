@@ -82,6 +82,10 @@
       const d = video.duration;
       if (Number.isFinite(d) && d > 0 && d <= 120) {
         video.playbackRate = 16.0;
+        // Bỏ qua quảng cáo tức thì: nhảy ngay tới cuối quảng cáo
+        if (video.currentTime < d - 0.1) {
+          video.currentTime = d - 0.05;
+        }
       }
     } else if (adActive) {
       // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính và kích hoạt phát tiếp
