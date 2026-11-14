@@ -21,9 +21,10 @@ const SHIELD_SELECTORS: string[] = [
   // Link tới domain cờ bạc: neo vào đầu nhãn host để không trúng "sunwind", "logo88"...
   ...GAMBLING_LABELS.flatMap((l) => [`a[href*="//${l}"]`, `a[href*=".${l}"]`]),
   'iframe[src*="popads"]', 'iframe[src*="clickadu"]',
-  // Quảng cáo YouTube ngoài luồng video
+  // Quảng cáo YouTube ngoài luồng video & Hộp thoại Anti-Adblock
   '.ytp-ad-overlay-container', '.ytp-ad-message-container',
   'ytd-ad-slot-renderer', '#player-ads', 'ytd-banner-promo-renderer', 'ytd-in-feed-ad-layout-renderer',
+  'ytd-enforcement-message-view-model', 'tp-yt-paper-dialog:has(#feedback)', '.yt-playability-error-supported-renderers',
 ];
 
 const SHIELD_CSS = `${SHIELD_SELECTORS.join(',\n')} {\n  display: none !important;\n  pointer-events: none !important;\n}`;

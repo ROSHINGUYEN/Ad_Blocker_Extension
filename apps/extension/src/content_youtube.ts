@@ -1,21 +1,16 @@
 /**
  * Content script (MAIN world, CHỈ youtube.com): bỏ qua quảng cáo in-stream.
  *
- * So với bản cũ:
- *  - Chỉ coi là "đang quảng cáo" khi #movie_player có class `ad-showing`/`ad-interrupting`.
- *    Bản cũ còn dò `[class*="ytp-ad-module"]` (container luôn có sẵn trong DOM của player) và
- *    `ytd-ad-slot-renderer` (slot quảng cáo ở feed/sidebar) => có thể tua/tắt tiếng nhầm VIDEO CHÍNH.
- *  - Hàng rào an toàn: chỉ tua khi duration <= 10 phút.
- *  - Event-driven (MutationObserver trên class của player) + poll 250ms CHỈ trong lúc có quảng cáo.
- *    Bản cũ: setInterval 25ms (40 lần/giây) + observer toàn cây DOM, chạy liên tục.
- *  - Khôi phục muted/playbackRate gốc của người dùng khi quảng cáo kết thúc.
- *  - Không xoá playbackTracking (làm mất lịch sử xem) và bỏ đoạn ytcfg vô tác dụng.
+ * Tiêu chí an toàn tuyệt đối:
+ *  - CHỈ can thiệp khi container `#movie_player` thực sự chứa class `ad-showing` hoặc `ad-interrupting`.
+ *  - KHÔNG bắt nhầm `ytd-ad-slot-renderer` (banner tĩnh ở sidebar/comments) để tránh tua nhầm hoặc tắt tiếng video chính.
+ *  - KHÔNG can thiệp parse/patch JSON của window.fetch / ytInitialPlayerResponse để tránh trigger hệ thống Anti-Adblock của YouTube.
+ *  - Khi quảng cáo kết thúc: LẬP TỨC khôi phục âm thanh (`muted`) và tốc độ (`playbackRate`) gốc của người dùng.
  */
 (() => {
   const AD_CLASSES = ['ad-showing', 'ad-interrupting'];
   const SKIP_SELECTOR =
     '.ytp-skip-ad-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button, .ytp-ad-skip-button-slot button, button.ytp-ad-skip-button-text, .ytp-ad-skip-button-container button, .videoAdUiSkipButton';
-  const MAX_AD_SECONDS = 600;
 
   function dispatchSyntheticClick(el: HTMLElement): void {
     try {
@@ -37,52 +32,6 @@
     } catch {}
   }
 
-  /* ---------- 1) Loại dữ liệu quảng cáo khỏi player response ---------- */
-  const AD_KEYS = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adPlaybackContext'];
-
-  function stripAds<T>(obj: T): T {
-    if (obj && typeof obj === 'object') {
-      const o = obj as Record<string, any>;
-      for (const k of AD_KEYS) if (k in o) delete o[k];
-      if (o.playerConfig?.adConfig) delete o.playerConfig.adConfig;
-    }
-    return obj;
-  }
-
-  try {
-    let initial = (window as any).ytInitialPlayerResponse;
-    Object.defineProperty(window, 'ytInitialPlayerResponse', {
-      configurable: true,
-      enumerable: true,
-      get: () => initial,
-      set: (v) => { initial = stripAds(v); },
-    });
-    if (initial) stripAds(initial);
-  } catch { /* trang đã khoá thuộc tính */ }
-
-  try {
-    const nativeFetch = window.fetch;
-    window.fetch = async function (this: unknown, ...args: Parameters<typeof fetch>) {
-      const response = await nativeFetch.apply(this, args);
-      try {
-        const input = args[0];
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        if (!url.includes('/youtubei/v1/player') || !response.ok) return response;
-        const json = stripAds(await response.clone().json());
-        const patched = new Response(JSON.stringify(json), {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers,
-        });
-        Object.defineProperty(patched, 'url', { value: response.url });
-        return patched;
-      } catch {
-        return response; // fail-open: không bao giờ làm hỏng request của YouTube
-      }
-    };
-  } catch { /* ignore */ }
-
-  /* ---------- 2) Xử lý quảng cáo in-stream ---------- */
   let player: HTMLElement | null = null;
   let classObserver: MutationObserver | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -90,10 +39,10 @@
   let savedMuted = false;
   let savedRate = 1;
 
-  const isAdShowing = () => {
-    if (player && AD_CLASSES.some((c) => player!.classList.contains(c))) return true;
-    if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay, ytd-ad-slot-renderer')) return true;
-    return false;
+  // STRICT DETECTION: Chỉ coi là quảng cáo khi player chính có class ad-showing/ad-interrupting
+  const isAdShowing = (): boolean => {
+    if (!player) return false;
+    return AD_CLASSES.some((c) => player!.classList.contains(c));
   };
 
   function tick(): void {
@@ -108,21 +57,21 @@
         savedRate = video.playbackRate || 1;
         pollTimer ??= setInterval(tick, 100);
       }
+
+      // 1. Tắt tiếng quảng cáo để không làm ồn
       video.muted = true;
 
-      // 1) Thử gọi API native player
+      // 2. Tự động click các loại nút Skip Ad
       try {
         const p = player as any;
         if (typeof p.skipAd === 'function') p.skipAd();
       } catch {}
 
-      // 2) Tự động click mọi selector của nút Skip bằng synthetic events
       const skipButtons = player.querySelectorAll<HTMLElement>(SKIP_SELECTOR);
       skipButtons.forEach((btn) => {
         dispatchSyntheticClick(btn);
       });
 
-      // 3) Quét thêm button chứa chữ "Bỏ qua" hoặc "Skip"
       player.querySelectorAll<HTMLElement>('.video-ads button, .ytp-ad-module button, div.ytp-ad-text').forEach((btn) => {
         const txt = btn.textContent?.trim().toLowerCase() || '';
         if (txt.includes('bỏ qua') || txt.includes('skip ad') || txt === 'skip') {
@@ -130,14 +79,17 @@
         }
       });
 
-      const d = video.duration;
-      if (Number.isFinite(d) && d > 0 && d <= MAX_AD_SECONDS && video.currentTime < d - 0.25) {
-        video.playbackRate = 16;
-        video.currentTime = d - 0.1;
+      // 3. Tua tốc độ an toàn 16x (KHÔNG can thiệp video.currentTime để tránh đứt stream SSAI)
+      if (video.playbackRate < 16) {
+        video.playbackRate = 16.0;
       }
     } else if (adActive) {
+      // QUẢNG CÁO ĐÃ HẾT: Lập tức phục hồi nguyên trạng video chính
       adActive = false;
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
       video.muted = savedMuted;
       video.playbackRate = savedRate;
     }
@@ -158,7 +110,10 @@
   new MutationObserver(() => {
     if (scheduled || player?.isConnected) return;
     scheduled = true;
-    requestAnimationFrame(() => { scheduled = false; bindPlayer(); });
+    requestAnimationFrame(() => {
+      scheduled = false;
+      bindPlayer();
+    });
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   window.addEventListener('yt-navigate-finish', bindPlayer, true);

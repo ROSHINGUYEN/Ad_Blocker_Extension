@@ -245,3 +245,24 @@
   - `pnpm test`: 43/43 tests pass. (ĐÃ HOÀN THÀNH)
   - `apps/extension` build thành công. (ĐÃ HOÀN THÀNH)
 - **Trạng thái:** PASS
+
+
+---
+
+## 2026-11-14 — Anti-Adblock Remediation, Safe Player Observation & Video Integrity Fix
+
+- **Mục tiêu:**
+  1. Loại bỏ triệt để modal cảnh báo "YouTube không cho phép trình chặn quảng cáo" (Anti-Adblock Modal):
+     - Gỡ bỏ hoàn toàn các rule DNR 30, 31, 32, 33 trong `rules.json` (chặn thô bạo `pagead`, `api/stats/ads`, `youtubei/v1/player/ad_break`).
+     - Gỡ bỏ can thiệp `window.fetch` và `ytInitialPlayerResponse` để payload của YouTube giữ nguyên tính toàn vẹn (không bị phát hiện giả mạo).
+     - Bổ sung CSS Shield ẩn `ytd-enforcement-message-view-model` và `tp-yt-paper-dialog:has(#feedback)` trong `content_isolated.ts`.
+  2. Khắc phục triệt để lỗi tua nhầm video chính và tắt tiếng:
+     - Xóa các selector kiểm tra `ytd-ad-slot-renderer` và `.ytp-ad-player-overlay` khỏi hàm nhận diện quảng cáo.
+     - Cơ chế nhận diện chuẩn xác 100%: CHỈ can thiệp khi `#movie_player` thực sự có class `ad-showing` hoặc `ad-interrupting`.
+     - Tuyệt đối không can thiệp `video.currentTime` (nguyên nhân gây kẹt đen màn hình và giật lag trên stream SSAI), chỉ dùng `playbackRate = 16.0` và tự động click Skip Ad.
+     - Khôi phục nguyên vẹn `video.muted` và `video.playbackRate = 1.0` ngay khi `ad-showing` kết thúc.
+- **Tiêu chí hoàn thành:**
+  - `pnpm -r run typecheck`: 0 lỗi trên toàn bộ workspace. (ĐÃ HOÀN THÀNH)
+  - `pnpm test`: 43/43 tests pass (11 test files). (ĐÃ HOÀN THÀNH)
+  - Build `apps/extension` thành công. (ĐÃ HOÀN THÀNH)
+- **Trạng thái:** PASS
